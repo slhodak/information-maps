@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plate Drill</title>
+<style>
+:root{
+  color-scheme:dark;
+  /* surfaces */
+  --void:#080d13;
+  --crust:#111c26;
+  --crust2:#182836;
+  --ridge:#263c4f;
+  /* text */
+  --ink:#eaf0f5;
+  --ink-dim:#a8bccd;
+  --ink-faint:#8ba1b4;
+  /* accents as text (must clear 4.5:1 on --void and --crust) */
+  --magma-tx:#f0964e;
+  --jade-tx:#57b894;
+  --rust-tx:#e4796c;
+  /* accents as fills, with the ink that sits on them */
+  --magma:#ec8a3c;
+  --magma-soft:#f6b476;
+  --on-magma:#20140a;
+  --on-magma-dim:#452913;
+  --jade:#3fa07c;
+  --rust:#c6564a;
+  /* map */
+  --map-bg:#0b141d;
+  --plate:#2a4056;
+  --plate-line:#82abc7;
+  --minor:#101820;
+  --minor-line:#3c5265;
+  --locked:rgba(110,180,250,.55);
+  --locked-line:rgba(190,225,255,.9);
+  --grid:rgba(150,190,220,.15);
+  --grid-eq:rgba(150,190,220,.30);
+  --land-fill:rgba(226,240,250,.10);
+  --land-line:rgba(238,247,253,.78);
+  --land-casing:rgba(5,11,17,.60);
+  --chip:rgba(17,28,38,.9);
+  /* markers sit on the amber lit plate in both themes, so a dark edge
+     rings every state and only the fill changes */
+  --mk-edge:#0d1a24;
+  --mk-glyph:#06120c;
+  --mk-off:#203a4e;
+  --mk-on:#fdf3e4;
+  --mk-ink:#3d2409;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --display:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --void:#eeeade;
+  --crust:#fbf9f4;
+  --crust2:#e6e1d3;
+  --ridge:#c3bba6;
+  --ink:#141b23;
+  --ink-dim:#3f4c59;
+  --ink-faint:#54626f;
+  --magma-tx:#8f3d0c;
+  --jade-tx:#0f5c40;
+  --rust-tx:#94271e;
+  --magma:#e2871f;
+  --magma-soft:#b96a14;
+  --on-magma:#1e1204;
+  --on-magma-dim:#412709;
+  --jade:#27795a;
+  --mk-glyph:#ffffff;
+  --rust:#b2453a;
+  --map-bg:#dcd7c8;
+  --plate:#b8ccd9;
+  --plate-line:#2f5674;
+  --minor:#7f96a7;
+  --minor-line:#3a5468;
+  --locked:rgba(20,70,150,.78);
+  --locked-line:rgba(214,234,252,.92);
+  --grid:rgba(20,45,70,.18);
+  --grid-eq:rgba(20,45,70,.34);
+  --land-fill:rgba(35,60,85,.13);
+  --land-line:rgba(12,26,40,.80);
+  --land-casing:rgba(255,255,255,.70);
+  --chip:rgba(251,249,244,.92);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--void);color:var(--ink);font-family:var(--ui);
+  -webkit-text-size-adjust:100%}
+body{min-height:100dvh;padding:14px 14px 28px;overflow-x:hidden}
+#app{max-width:660px;margin:0 auto}
+h1{font-family:var(--display);font-size:27px;font-weight:700;margin:0 0 4px;letter-spacing:-.01em}
+h3{font-family:var(--display);font-size:16px;font-weight:700;margin:0 0 8px}
+p{color:var(--ink-dim);line-height:1.5;margin:0 0 12px;font-size:14px}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--magma-tx);margin:0 0 5px}
+button{font-family:var(--ui);cursor:pointer;color:inherit}
+.btn{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  background:var(--crust2);border:1px solid var(--ridge);border-radius:11px;padding:11px 14px;
+  font-size:15px;font-weight:600;transition:background .12s,border-color .12s}
+.btn.on{background:var(--magma);color:var(--on-magma);border-color:var(--magma-soft)}
+.btn.on .sub{color:var(--on-magma-dim)}
+.btn.primary{background:var(--magma);color:var(--on-magma);border-color:var(--magma-soft)}
+.btn.block{width:100%}
+.btn .sub{font-size:11px;font-weight:400;color:var(--ink-faint)}
+.card{background:var(--crust);border:1px solid var(--ridge);border-radius:14px;padding:14px;margin-bottom:12px}
+.pair{display:flex;gap:8px;margin-bottom:14px}
+.pair .btn{flex:1}
+.link{background:none;border:none;color:var(--ink-faint);text-decoration:underline;font-size:12px;padding:4px 0}
+.note{font-family:var(--mono);font-size:11px;color:var(--ink-faint);line-height:1.5}
+
+/* header */
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:9px}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)}
+.subject{font-family:var(--display);font-size:21px;font-weight:700;line-height:1.15}
+.hud{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-align:right;white-space:nowrap;line-height:1.6}
+
+/* map */
+/* full-bleed: break out of #app's column and the body padding, capped so it
+   stays sane on wide screens. viewBox keeps the 2:1 ratio, so it grows taller. */
+.mapbox{position:relative;background:var(--map-bg);
+  width:min(100vw,1200px);
+  margin-left:calc(50% - min(50vw,600px));
+  border:1px solid var(--ridge);border-left:none;border-right:none;border-radius:0;
+  overflow:hidden;touch-action:none;overscroll-behavior:contain;outline:none}
+svg#map{display:block;width:100%;height:auto;touch-action:none;outline:none}
+svg#map:focus,svg#map:focus-visible{outline:none}
+svg#map *{touch-action:none}
+.mapbase{fill:var(--map-bg);pointer-events:none}
+.themebar{display:flex;gap:6px;align-items:center;margin-top:10px}
+.themebar .tglab{font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-faint);margin-right:2px}
+.themebar button{flex:1;background:var(--crust2);border:1px solid var(--ridge);border-radius:9px;
+  padding:7px 4px;font-size:12px;font-weight:600;color:var(--ink)}
+.themebar button.on{background:var(--magma);color:var(--on-magma);border-color:var(--magma-soft)}
+.grid{stroke:var(--grid);stroke-width:1;fill:none;pointer-events:none}
+.grid.eq{stroke:var(--grid-eq)}
+.land-fill{fill:var(--land-fill);pointer-events:none}
+.land-casing{fill:none;stroke:var(--land-casing);stroke-width:2.6;pointer-events:none}
+.land{fill:none;stroke:var(--land-line);stroke-width:.9;pointer-events:none}
+.minor-fill{fill:var(--minor)}
+.minor-stroke{fill:none;stroke:var(--minor-line);stroke-width:1;pointer-events:none}
+.plate-fill{fill:var(--plate)}
+.plate-fill.locked{fill:var(--locked)}
+.plate-fill.lit{fill:var(--magma)}
+.plate-fill.hit{fill:var(--jade)}
+.plate-fill.miss{fill:var(--rust)}
+.plate-stroke{fill:none;stroke:var(--plate-line);stroke-width:1.6;pointer-events:none}
+.plate-stroke.locked{stroke:var(--locked-line)}
+.plate-stroke.lit{stroke:var(--magma-soft)}
+/* markers always sit on the amber lit plate, so they are keyed against amber */
+.mk-hit{fill:transparent}
+.mk-box{fill:var(--mk-off);stroke:var(--mk-edge);stroke-width:3}
+.mk-box.sel{fill:var(--mk-on);stroke:var(--mk-edge);stroke-width:3}
+.mk-box.bad{fill:var(--rust);stroke:var(--mk-edge)}
+.mk-done{fill:var(--jade);stroke:var(--mk-edge);stroke-width:3}
+.mk-glyph{fill:var(--mk-glyph);font-size:17px;font-weight:700;font-family:var(--ui)}
+.mk-num{fill:var(--mk-ink);font-size:11px;font-weight:700;font-family:var(--mono)}
+.zreset{position:absolute;right:8px;bottom:8px;background:var(--chip);
+  border:1px solid var(--ridge);border-radius:9px;padding:7px 13px;font-size:13px;
+  font-weight:600;color:var(--ink);display:none}
+.zreset.show{display:block}
+
+/* status + input */
+.recall{background:var(--crust);border:1px solid var(--ridge);border-radius:12px;
+  padding:9px 11px;margin-bottom:11px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 9px}
+.recall .rlab{font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-faint)}
+.recall .rname{font-family:var(--display);font-weight:700;font-size:15px;color:var(--jade-tx)}
+.recall .chip{font-family:var(--mono);font-size:12px;color:var(--ink-dim);background:var(--crust2);
+  border:1px solid var(--ridge);border-radius:7px;padding:2px 7px;white-space:nowrap}
+.recall .chip b{color:var(--ink);font-weight:700;font-size:13px}
+.recall .rmiss{font-family:var(--mono);font-size:11px;color:var(--rust-tx)}
+.recall .rgood{font-family:var(--mono);font-size:11px;color:var(--jade-tx)}
+
+.status{min-height:19px;font-size:13px;font-weight:600;margin:9px 0;line-height:1.35}
+.status.ok{color:var(--jade-tx)}
+.status.bad{color:var(--rust-tx)}
+.status.dim{color:var(--ink-dim)}
+.answer{display:flex;gap:8px;margin-bottom:4px}
+.answer input{flex:1;min-width:0;background:var(--crust2);border:1px solid var(--ridge);color:var(--ink);
+  border-radius:11px;padding:12px;font-size:16px;font-family:var(--ui);caret-color:var(--magma-tx)}
+.answer input::placeholder{color:var(--ink-faint);opacity:1}
+.answer input:focus{outline:2px solid var(--magma-tx);outline-offset:1px}
+::selection{background:var(--magma);color:var(--on-magma)}
+.answer .btn{flex-direction:row}
+
+/* compass */
+.dial{background:var(--crust);border:1px solid var(--ridge);border-radius:14px;padding:12px}
+.dial-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
+.dial-head .tag{color:var(--ink-dim)}
+.rose{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:230px;margin:0 auto}
+.rose button{aspect-ratio:1;background:var(--crust2);border:1px solid var(--ridge);border-radius:11px;
+  font-size:21px;display:flex;align-items:center;justify-content:center;padding:0}
+.rose button:active{background:var(--magma);color:var(--on-magma)}
+.rose .mid{display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+  font-size:10px;color:var(--ink-faint);text-align:center;line-height:1.3}
+
+.foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:11px}
+.foot .btn{flex-direction:row;padding:9px 13px;font-size:13px}
+
+/* done screen */
+.figures{display:flex;gap:26px;margin:12px 0 14px}
+.fig{font-family:var(--display);font-size:40px;font-weight:700;color:var(--magma-tx);line-height:1}
+.figlab{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-faint);margin-top:3px}
+.key{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink-dim)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+@media(prefers-reduced-motion:no-preference){
+  .mk-box.sel{animation:blink 1.1s ease-in-out infinite}
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.45}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* ==== PLATE DATA (Bird 2003 PB2002 boundaries; NNR-MORVEL56 motion) ==== */
+const PLATE_DATA=[{"id":"af","name":"African Plate","aliases":["africa","nubian","nubia"],"rings":["xuIvA_DzDv@dEuXnPlAlKiIbEr@xHaLxCxAxPcJ~A_AbJaLrC{QjBiC}D_DViDlGwH}@aDzB_BgOkPsBs@}FaQrC}@cH_SnH_EyCeKlBgCqKqMVuKjEf@~EwHj@yCuEcIpA`@fDoMhB}AkKiXtByBgNsGAyC`EsOB\\jBkFzApB`MeJxEvGtq@uIrATzFcCb@fApTaDTElCcNj@RzJsOvC_Ivg@aO|D[tPgFGuBfFeOPc@fIgr@qJu@vHme@mVRuBwVcPt@_IcJ}Gt@cIyIgFkB}KeLaIxBuOhL}UiDmd@RkWtHaL_DaItOs[k@kGwG}@sAkDn@kL{Hmt@uIwSdCkZ`FaAuA}HeHkBd]mh@@oO{EsN`FaXwIuOxq@lLjaA}d@jHbCtK{DhBfBdIcK`h@zb@mCjXfH~I|GA`AcF|\\dPhIO~TsHzFeRhMeFjL~B`]aFrI~JjI`@dFzV|JfJbJsAtBdGzG@`ReRzb@kp@jn@fWbs@xa@gBvGnFnCiDpm@{D~OhCtKgBpDpG`KkBbE`IzLuBbFzBzL{CrGnFtT"],"vectors":[{"lon":8.0,"lat":13.15,"dir":"NE","speed":30.7}]},{"id":"an","name":"Antarctic Plate","aliases":["antarctica"],"rings":["|yK_db@pvC??~heAqvC?pAqFcEcRbCeGgHoRbB{FyMmTbEyOwEsJxDk`@cn@ciA|Fk[wTeNjNecBcIoFpA_LsIwDk@fGaUeO~AuNon@iQwk@WmByHjNq}AfHYlAsM|Lu@Bgn@~V{JmBgVlGmBSiI`UhEt\\cGnMaYzYmzArJ`k@lD{L_S{bAbGmyAcEiXnA}nAkIoHmCaLqB_w@oF}DOqG{C?_@gRoK_\\zCsG{B{LtBcFgNa_@bIypAoFoCfBwGsb@oVJcG_NqKBqM}HeKx@cLaPeGqC_SyFa@_Hwd@}FKCaF_I}CeEoPcJQwFqU_IIkIof@cIuPtOyZl]_V`CrCtOmJ`EfFfBiCpMpDvHqLwC{D~IuN{KcN~[wbApEjDbHsVmCsBpPufA|@uM_FkOxCuUeFqB~DsGgEmKlDqIyEiBXoDrF`@jBmTo@ww@pUiE`D{e@|PkEYuDhLoFfD_G_BuMrQsPaHy\\nFiKsB{JbF_JyC{MhMmZwCeK`JsZ"],"vectors":[{"lon":-99.0,"lat":-67.0,"dir":"E","speed":20.3},{"lon":161.0,"lat":-76.0,"dir":"SE","speed":13.9},{"lon":-49.0,"lat":-75.0,"dir":"NE","speed":15.1}]},{"id":"ar","name":"Arabian Plate","aliases":["arabia"],"rings":["kwCmuKjMbQbCDzRxJtOz@dCbBe@jAvAvAu@jA~@l@u@lTp@R]jArAh@cAvIxHpDe@xHdBnAlCxPNjPtAbIyBjAjAvAwG~EiBgBuKzDiBcBaE_@oRbMcLhBeF`EoJfCaNdIkc@eHyCuBaM]eC_AoIiYzAo@nHkPtNcEnFwDzDiHh@wE~GgErFyHxEk@`JcOHmD}BmLtN}AdA_BdAyXy@eR"],"vectors":[{"lon":47.0,"lat":21.58,"dir":"NE","speed":48.6}]},{"id":"au","name":"Australian Plate","aliases":["australia"],"rings":["zhE~cb@ggB?K}PzBlB`SsItoAbX","r`B_db@fgB?hj@lZbD{A|E~GrDmDzBdXlLhZ`J~KvTbJbUbX~X~H~UqU`Hx\\sQrP~AtMyDnBPnCiLnFXtD}PjEaDze@qUhEn@vw@kBlTsFa@YnDxEhBmDpIfElK_ErGdFpByCtU~EjO}@tMqPtfAlCrBcHrVqEkD_\\vbAzKbN_JtNvCzDwHpLqMqDgBhCaEgFuOlJaCsCeHrIgTjKuOxZ{]vG}BhLsKzGwG_NwOfHeFwAaDdCaUsM{AnAsF}Bl@__@aPaBzBq\\}J{a@tE}QuSgOkIeXsFaFxB}Ehu@wf@pRkh@vEmnAyPex@yLgPsHk@uBmSpDsUzZup@vCq`@}CiKqGi@vQs]VeW~s@iQjLgGfFiKm@oMmIuN{GnB_S{ByD{V"],"vectors":[{"lon":111.0,"lat":-29.91,"dir":"NE","speed":70.1},{"lon":152.0,"lat":-45.91,"dir":"N","speed":54.2}]},{"id":"ca","name":"Caribbean Plate","aliases":["caribbea"],"rings":["ouBt_KL_CjKkJjHsAlBwC~RaBjHrCaBvo@\\nKeKdIkDtE]jF`@bH|FjF|BdFbG~DnGPiFxBmCzDbAhLdD`G?tA{ErMQhElArFcHlIgDhKGxBaDQ}LaK}BgFyEuT{AmOsEXeH{y@rCwTm@eOXcQpCiJ"],"vectors":[{"lon":-63.0,"lat":14.73,"dir":"NE","speed":17.6}]},{"id":"co","name":"Cocos Plate","aliases":["coco"],"rings":["__Ap|ObDsCxHwO~AgApYK@jIlHTGxC`DFy@|_@{BFq@zGi@Ea@nH[|Hx@BCrDhAJuAdWLbHiACGrBuAVi`@xCKbGwHFSkCaJ`@cTvD^|BsONUd@_B]oAe@bFyKrIaYnBiJN{GzKaUnHuWbHmI"],"vectors":[{"lon":-96.5,"lat":8.33,"dir":"NE","speed":71.0}]},{"id":"eu","name":"Eurasian Plate","aliases":["eurasia"],"rings":["k_F?W`QjJhFb@|IwCp@uJnW~C`IuH`LSjWhDld@ePve@_VyA_VcKkJjAyLdLwF^gC|^gD|@_SuFw]}k@kKcVi@qXoDuJcHkDkDdOoVq_@r@gIqFoDhA_o@oNeoAqJrHsNc@_DdZcB_EgD`i@q@cCaG|SsAiGkB|ToBcRyMi~CgEazFrQkzHxIqk@jRae@`^i^de@kx@|HeZvZeS`Kx\\nVrCnL_EkRthBe@za@zEfw@zAfFvMpGhKxWro@kPxQy^wCyFvHsXuMy^lKiMdd@wFjPbQt@xUuUt\\CnG`XlP`F~UlJtLrZcPdIgZdTgK`DbfAzRhTH`P{t@pBs^_HSvJtEzJhAhk@qOnl@a`@bi@hPvNpOJiBbOxYf@~E|Kx@dReAxX{P|DrBzQgDnGg\\`XeF`OcXdMiMnVcGfZh@tr@lDjShI|Fg@hMdCZqGrMdHjBtA|HaF`AeCjZ~HxPxHtr@"],"vectors":[{"lon":60.0,"lat":59.4,"dir":"E","speed":23.5},{"lon":24.0,"lat":61.4,"dir":"NE","speed":22.1},{"lon":120.0,"lat":68.4,"dir":"SE","speed":21.0}]},{"id":"in","name":"Indian Plate","aliases":["india"],"rings":["kzAu~Iw@sReCcBuO{@_W_KkTa^yYg@w@mBjDeDIoF}IkAsD~@iPwNfJmOxF}B~LwTpOol@iAik@uE{JRwJjAWrWjHzt@wAeCdGzAxIfIbG`N~AnOKxUkEfKwE|DuFrF`FjIdX|CzCvGrA~EvGuE|Q|Jza@T`NqCnM`P`BwBjUhArHmB`B}CeDuApAaBmBuAnAeA_AoDzCeAgA{EnDoAy@{A~BwLdAuAfCkCmAcF|Tw\\z[oDd@aAvEaQ{FuJhK"],"vectors":[{"lon":77.0,"lat":13.96,"dir":"NE","speed":57.9}]},{"id":"jf","name":"Juan de Fuca Plate","aliases":["jdf","juan de fuca"],"rings":["qaIxpX`A_C|BuCbAsCtAwARq@x@c@pAE|CyEzDaC`M_ClEOZPbBBjAc@nBQdAX`BCxCkAp@B~@i@[vPQ?EZkE_@DUYi@eCg@aCqA{H`WcAUgA{@WVaB_AGf@s@CEYg@WDm@iG}BUp@_Bq@_@h@mAm@yBzHcBcAOZ_@[O`@_@OqCbDsAk@"],"vectors":[{"lon":-127.5,"lat":45.31,"dir":"NE","speed":16.5}]},{"id":"nz","name":"Nazca Plate","aliases":["nasca"],"rings":["zvEziTwG\\g@wAkEvFkAhJeMi@_BpFcJPi@uA{Im@E}AkJo@eErHUbFou@mKB{G_HOaRiFj@_HiPoDLaBeKkCNmCaB_@o@gDj@gJm_@oByB}FaBvBfAi`@_CcEZ}H|BeQzBGx@}_@aDGFyCmHUAkIqYJrAyD}AyFNwKlJsCfLtC|U`Ovb@nClTyFvW}N|c@_g@fKcBrmApI~PjHzv@xHRhImGlBlBfVcLrBVzDsJjAnA|TsAhX}Lt@RnGkBHHxDgHXuJtzAuBzA"],"vectors":[{"lon":-95.0,"lat":-19.76,"dir":"E","speed":70.8}]},{"id":"na","name":"North American Plate","aliases":["north america"],"rings":["q_BhcHsJnq@{InOwFlaB|Gdt@rEYrLjl@~QrK{Or]sMfm@cJdP_NzD_@dJiI_Awd@`b@uI\\wJfHyLbZk]~\\{p@lKg]jd@e`@nZcKzQzAdY`OrWrPfp@~Sx_BdChs@{uF??_ieAh|E?pX?qH|q@mZzx@oNsMuGsXaHuIB|gBue@`zA}j@b`AiXpVkR`e@{Hbf@qRx_IfE`zFxMh~CnBbRjB}TrAhG`G}Sp@bCfDai@bB~D~CeZrNb@|I_InNzjAjAtZaC~WpFnDs@fInVp_@jDeObHjDrGnh@hh@x~@|I~EhMg@fC}^vF_@xLeLzMq@nRhJ~UxAvIbGzDvNxIfFu@bIbJ|Gu@~Hjb@z[dYjNt@wHfr@pJ"],"vectors":[{"lon":-47.0,"lat":70.58,"dir":"NW","speed":22.8},{"lon":-114.0,"lat":67.58,"dir":"SW","speed":22.6},{"lon":-83.0,"lat":54.58,"dir":"W","speed":20.0}]},{"id":"pa","name":"Pacific Plate","aliases":["pacifica"],"rings":["|yK~cb@uqD?ao@aW}rAaWkIbJ`AzSoCdGpG|FeyJ?m`@?eCis@_Ty_Bad@{tAjCcU|q@aq@hLeAxB{HvYvHzHaWfNxEr@sSj]_[tKaYzKiItI]vd@ab@jUxEbMiXrOO_@}BbTwDlT`BJcGbf@qDve@dCtA|T`\\|Kk@~G`[xFCzGd{@jLlL~J|GuGl@gLrLCr@eFp\\bDxEgJhWvA@oDzbAxT_BtN`UdOj@gGrIvDqA~KbInFkNdcBvTdN}Fj[bn@biAyDj`@vErJcExOxMlTcBzFfHnRcCdGbEbRqApF","b_Kun^_VpU_Y_IcUcXwTcJaJ_LmLiZkFke@cZ}MtqD?aJrZvCdKiMlZxCzMcF~IrBzJoFhK","szH_db@rzK?gLh\\fDxX{@l^qNvEK`VuOd\\}FbJcPEsJxFwKvZuVrBcPlM{Tbq@{IyAr@gKaHs[{SqMsXj@kKvD{RnTgc@nDyZ\\}NaJsRyBq^ww@kk@yv@yLaI`Uqv@jF_k@"],"vectors":[{"lon":-159.0,"lat":-41.16,"dir":"NW","speed":57.3}]},{"id":"ps","name":"Philippine Sea Plate","aliases":["philippine","philippine sea"],"rings":["e_Ec}XaFsFuJeX_GwBbDaSzTcAhSkE|NZfBsArGzFvEqDpHsACu@hCqAvLoCTz@`JYVdAxBOv@xAfS~EjBtLs@fK~JbBhGzCnDlG?jIlExEnJ~BrXv@oEtSaICoPvIuOv@gQhEqFLeNxFsJdb@uERmM_GkSNaH{B}@gAjCwA|CuFEkQyOiTo[sT"],"vectors":[{"lon":141.0,"lat":17.02,"dir":"W","speed":50.1}]},{"id":"sc","name":"Scotia Plate","aliases":["scotia"],"rings":["ldI~|MhIoZlCiRUoRaCk`@CmX{CwYi@{Qt@yWrFmUrEu\\tAsCPoHu@qHgEdCpBoYz@~@dA@LbBhCJXfAx@?n@yBbBK?k@pFR@mAhCA@nBrAO`BuAF{J\\?i@d\\bEhXiAtOmArCdArG_BjDiBre@VnO~Al@|AnK|AjFiB@sAhOuHvXqEjUkGbc@}DfOyI~OiEtBkD`@"],"vectors":[{"lon":-46.0,"lat":-56.51,"dir":"NE","speed":16.2}]},{"id":"so","name":"Somali Plate","aliases":["somalia","somali"],"rings":["vdHygEs}@}`@{b@jp@aRdR{GAuBeGcJrA}JgJeF{VkIa@sI_KmLvB_Gq@sGzCkL_CiMdF{FdR_UrHiIN}\\ePaAbF}G@gH_JlCkX}D{B?eCcb@yZeBoZsFiSd@yHyHqDLyXtJiK`QzF`AwEnDe@v\\{[bF}TjClAtAgCvLeAfKuFdAfAjIkDtI`ElBaBrF|BzAoAzC|DfAy@nCvDpFFzAnC`DeCvAlBlCUvOgHvG~MrK{G|BiLx\\qHxErOjCz@nB`UbE~GVlG~HHFxH~EpCNdGbJPRfGtD|AChE~H|CB`F|FJfAfSjDjEj@bJxF`@pC~RvJnAMbCvDp@y@bLlDlAUpCdDdDCpMnGfCo@fC~F`Cs@nE"],"vectors":[{"lon":50.0,"lat":-12.26,"dir":"NE","speed":30.1}]},{"id":"sa","name":"South American Plate","aliases":["south america"],"rings":["zsDhmA|@bH`QsCr@|FjPrB~AfO`D{BvH|@hDmG~CWhC|D|^_G~@cJbJ_ByAyP`LyCs@yHhIcEmAmKtXoPw@eE~C{Dv@hFfB?^fRzC?NpGnF|DpB~v@bCvAHhIjInHWh[{@fKeH_L}In@_L`T}Bhe@fEeCb@`RmQdgArIjzBeCf\\iInZ_QjBeLkEw_AwH_QkHeiAeIwBoo@sN]yGzAeAvHkUxRkFpTZtFhSpOmf@z\\mTxFgMCyIwQcOsFe\\o`@{G{AkElBcNsRmBeNdBmu@kHsC_S`ByKjFyKjNaB_InAkNzIoO~GkZvBk`@dOQtBgFfFFZuP`O}DN_KpH{PA{IrOwCS{JbNk@DmC`DUgAqTbCc@U{FtIsAwGuq@dJyEqBaMjF{A]kBrOCxCaErG@xBfNhXuB|AjKnMiBa@gDbIqAlB@j@rEvHk@g@_FpN}EtJEfCpKdKmB~DxCbO{CUgBpCk@"],"vectors":[{"lon":-41.0,"lat":-29.81,"dir":"N","speed":10.9},{"lon":-64.0,"lat":6.19,"dir":"NW","speed":10.0}]},{"id":"su","name":"Sunda Plate","aliases":["sundaland","sunda"],"rings":["`r@slSaEhLsFzEwl@d_@sAkB_Q`@wL|K{@kAwJpDq@sAsDlAmYkNIaPkO_MoBiF]ip@cCyTyFiHq@iIqLkG_@cF~BeDpGIzKrFfIBrJeb@dNyFni@oGnPwI`IBuF~EKpFnLrD~BlCqDxFyHrBiA|D`@hM|BnDjIa@zRrDrG_JhZu@dFsAhGZgFzhAcC~LkH`M"],"vectors":[{"lon":100.0,"lat":9.51,"dir":"E","speed":32.8}]},{"id":"am","name":"Amurian Plate","aliases":["amur"],"rings":["e_Ec}XiEzEk@nDKtEvA~DhA`No@~QkPcQmN^wTvEmKhMdFvJnF`SwHrXvCxFyQx^qg@jJaG~DiKyWkHyBkDwC{AgFoAca@kCcUd@{a@rJ}q@hFsg@LcM`CwAvNxAnL_BnN|T`K|CnHm@xCAfB`AxGa@dCbDrALtOW~F{C`Ex@hElGhFtQ`FrF"],"vectors":[{"lon":135.0,"lat":49.75,"dir":"SE","speed":25.9}]},{"id":"ok","name":"Okhotsk Plate","aliases":["okhotsk"],"rings":["ytEwuZcD`S_GzCuOVsAMeCcDmCSkCt@gBaAyC@oHl@kIsBePgVoL~AwNyAqPvGoVsCaKy\\iTtKvI}\\pJmY~Auy@cBgm@`HtItGrXpApA|K`KpFgHxL`IfDnHdCbAjG|GvBpExUt[bUvi@lH~LrRxB|N`J|Dd@"],"vectors":[{"lon":151.0,"lat":54.21,"dir":"SE","speed":25.0}]},{"id":"ya","name":"Yangtze Plate","aliases":["yangtze","south china"],"rings":["grBogUeTfKeIfZcJjIoOvEuD{AwDyIaF_VcDaDkFEqKeKBoGpTgXb@mCkAgGdAq`@oB_RxCzBtAi@jCjAhBqA`CrC|@o@rCpF`@M~AfCf@OnDfFx@O^nEfA?j@bE_@hFhA`Eu@n@bE|CzCd@xHQ_CdDt@bCU~AxBvAzCb@zCnCp@hIxFhH"],"vectors":[{"lon":106.0,"lat":26.94,"dir":"E","speed":36.9}]}];
+const MINOR_DATA=[{"name":"Timor","rings":["xfAqrViG[uM`Bp@mGw@uMwBuRiDqJlAoFGaM|H|FzAnD`BlR`JhYbBpM"]},{"name":"Kermadec","rings":["fgF~cb@k]?qa@kKsOwBgAgNlRrAhOtC`PjHrPdEjLnG"]},{"name":"Kermadec","rings":["|dGoka@\\rBsDlD}E_HcDzAwZeRqNgGj]?hQpFzExCnCbK"]},{"name":"Tonga","rings":["lsCrda@fAfNsGeC{SyC|@yCsJ_CeJ?uAp@}@oB{CsAHuAbEqEtI@hQhDdU~I"]},{"name":"Niuafo'ou","rings":["xyAn}`@pFlE|@{@dJ?rJ~B_BjGgFq@wKhGiB{EkDc@{@_If@uD"]},{"name":"Woodlark","rings":["`IqcZyAb@nKo\\fDuD~IwEjGkKnBmIz@yNrB_G`C{@sIuLfCiDhEYfAbAhAtJpAHN`DoCjJ@tEr@l@wB|Ej@jA}N`XaGjS{BfC{TlJ"]},{"name":"Maoke","rings":["|^_oZyClPG~QiJgKoDwKzTmJ"]},{"name":"South Bismarck","rings":["dm@u_\\y@|EkGjK_JvEkBfCCwO|@sA{DcExEcNs@gJjOyJ{B~F|IjX"]},{"name":"Solomon Sea","rings":["bf@aa]tFoHrItLaCz@sB~FqBhR}IkXzB_G"]},{"name":"North Bismarck","rings":["bf@aa]{LpGoAfBTxBkC`DpB~CaDnKzDbE}@rABvOyChHwFeCmC_HyA_MRgLjMe^rJyFtJtAlDoAmEfE"]},{"name":"New Hebrides","rings":["buAmm_@u@iNpBcOy@WkA}FvLaE`CNtBwAnI`ChOY@sCjGPhC|HErC_AdFwDtFuO|HaKpB{GnDeLX"]},{"name":"Altiplano","rings":["jaBnyMiSqO[uFjFqTfEiFbOoKdAwHxOgCrFhAXtg@|AxFwIH}DlAgU`Y"]},{"name":"North Andes","rings":["od@pfNuFjCqFgJiI_AgEiCyD{G}FkFCoOrNaO|@YjAjGbNrRjEmBzGzAvUvUlEvIbOrF|FxKCzBoQiAmJ{DoJeIgLuCaBR"]},{"name":"Okinawa","rings":["c~C{aX~KdQQzNsF|GiAaEf@}Bs@oHgA?_@oEy@NoDgFiDiBsCqF}@n@aCsCiBpAkCkAuAh@yC{Bq@aAv@eKhE{EjMlH|@bCdHlDpFfG"]},{"name":"Caroline","rings":["sy@w_ZlC{LrJsQxDsPbPmMhIAjLqBkA~Jr@nM|B`JpHhEqHrTcAVwFhVpB`Ia@bDsXw@oJ_CmEyE?kIoDmGmHeD"]},{"name":"Mariana","rings":["igAk}ZeRcEw@yAyBNWeAaJXU{@wLnCiCpABt@qHrAwEpDsG{FbRsSvOgEpGGdIb@hMxDpEvGrC`M"]},{"name":"Futuna","rings":["f`B`ra@m@`Ff@jFsHmCbCcECwG|CTZdC"]},{"name":"Shetland","rings":["nyJvbJrAiOhBAbJpm@mDzLsJak@"]},{"name":"Aegean Sea","rings":["m|EyxDV|DbEtHAnO}HzOiF`FiE~AgA_@f@iMiI}Fo@{GvLkPbEi@tHgG"]},{"name":"Anatolia","rings":["_zF{}C}BoJb@cWeBeVzGs^zB}EnIhYrGjAvItO@~BcF`TuHfGcEh@wLjP"]},{"name":"Burma","rings":["_yA_zQt@CdA~BdOpEjE|CrDmAp@rAhF{Cp@|@zAsAz@jAvL}K~Pa@rAjB_FdJ{FjFwc@rIeUgAwLgH{AyIdCeGrCM"]},{"name":"Rivera","rings":["{gCreTRqIfCyAnFa@fFkEnDbAInCuBMuBlKwDrFuJmD"]},{"name":"Birds Head","rings":["sEofX|C{JrA}LqBaIvFiV|C{@nDvKhJfKdBrEiAlFyHjIsBvOqK`N_Ga@mGqCJqFtF_F"]},{"name":"Molucca Sea","rings":["uIeuWlKzAfHsIhC?|FdAlEzGa@fNiHi@eInSqLbFmDKyAmAeAkPhA}DxHsBpDyF_CmCoH{A"]},{"name":"Banda Sea","rings":["fVwzWgKeAhBmCrBwOxHkIhAmFhBzAz@iBlCx@`AfEF`MmAnFhDpJ`Dje@c@lCyRf@sG~I{RsDrGuDdIoShHh@`@gNmE{G"]},{"name":"Manus","rings":["zUsp\\n@rEw@rAqB_DxBgC"]},{"name":"Conway Reef","rings":["hhB{}`@y@wB|@kA_AcGxFh@n@iAtIzCzGoBfG`LkGQArCiOXoIaC"]},{"name":"Balmoral Reef","rings":["hrA{ha@tKcZr@?tBfOz@Ax@rUeTrFOiR"]},{"name":"Easter","rings":["diCbjUTcFdEsHbDENlAvDWD|AzIl@g@bN}GtG_AmAmANwA{CmBf@yAmEuD]"]},{"name":"Juan Fernandez","rings":["bdEb{Tb@iGfCyFjB}Af@vAvG]lBxHiB|HsDb@gLsB"]},{"name":"Galapagos","rings":["oO||RFsBhAB`BwBdAn@r@lEmHU"]},{"name":"Sandwich","rings":["|vIhwDJyJtCwJhGiHlEqAnC`@pEvErAfEl@dIe@zJuDdBAoBiC@AlAqFSmEpDYgAiCKMcBaCaA"]},{"name":"Panama","rings":["qu@f~MtGhKn@`H_AtBxAvG}L~ToEnEqAqHpFuTeDaGcAiLlC{DhFyB"]}];
+const LAND_DATA=["fsNhsJ~DtBO`ZcCfJXqZwC}FpAoE","zoN`b^X~JmEbOk@kN~EwK","xfNdyGtAuFtHuBfEtk@oA~UkEyRwHqM?}T","jjMptVCqNxBlHuA|M_@yG","p`MriRBuLpBuBCr[yBtHF}S","nzLxjLpF`A`AjMCdGmAaBv@hMmCbD}AkQoIaA}BiH~KgJ","|oKhmJ`ChTfC|BlCiB|@dI`H~J~FmNhHuGrQcEvH~TpG`f@Nnh@nFkU|AtY~CPvEsOfL}`BfDeHiH{s@dAmj@oCwKkEkkAwEbFf@dd@_FZmIcj@sH_fA}BkJmAy@o@rEoCkEuCwRaFmKtA_QyCmBhByNm@_VpAuA}Iyp@VeJbDaGkDgOtAuIeByX`DuSo@g[_Ds]gFwJ~F{\\wWgbB\\mJfG{MbCyOkBkOfBg]bG{CvErJhA{FhF~EpA_Ka@eF{LwPqAsVaFeH_F}UKyW{DwFzDoIn@ee@[sWqImRpG}SqEkm@bDoKpBmY}CeTv@{a@mBgd@sD}@fI}MEeq@bEgF`BuL~A{U}@cJrKql@p@{b@lDkWfK~JnC~RrJvNdDN|EyFpBcMpAt_@dJjK~Pa{@nDgaA``@??~heAa`@?qB{DlAg\\aCuZhHgiAn@sz@qB{`@}Ak@oDzaAiIqC{DzWn@ue@gEmYcElR{@fc@mE~OcF~@dB_k@wDu_@{ERc@aGbAuBwF}w@b@}_ByC_c@fEgIy@oEvCcVVej@uAiBwCdNiH`FfE{l@{@af@wCkDvDgXhAgVoCiFfDoX_Eol@_EiJqMxGkF_EqF^yAaB_MqYyFqZZqGzBtG","poIlfLhD{ObBxA{@bHlClFUvEgE|QkI~MtFeUuH_JVoCpFoD","j~H|lJxA_DdAz@nApOyAbBuCqO","tuHgvLLrHgFg@vA}H`Cp@","|}Fwk[PaQpMjAbArJ}MhG{ACPcC","v~Fkx`@tAuFrKrH~AiAlAdIlIdDpC`GsApO}EiA_LuT}K{H}AkCtAk@","~`Fiba@pEqCgCClGwGc@_JdHlBCvCjLnFnAxCqAtBcDsBmB`AoAvEmCuC{GYyPzKrCqIpDw@","niCos_@_BhIyH~GxKiR","vsA{wHlL_A?lChFSjq@tObCpIyBpGiQ|CmK_FsOpAmFaBwAsJmFwG}NgHnHmD","~tAg`[|CgAkA_C`DaDzWkE|GkNdKeDJqErEa@hO_MvKuA`UfCdX~N~I`A`I~U{B~GgB]tDzG}CpQwJtEiB`HuFQnDrGcIsEsCNlKjJqAzCsJzD_FjQnCj_@rC`KxDnBPpVvEtJEtGeD~H{DgCiIBia@tMtAwAyDbAfC}C_KfDkOwCvCOkJoNkE}XmSmLjDsAg@uA}AfAaB_Aj@wAcL}GqAsGpEaGR{FmBh@wJqFuAgKgDvC[kB~EkQmAmF`B{A`EdEnIzA|Oo\\gGqE{WsA{IeDhRoE","j~@whWRbE{HeIs@aMzIbQ","pq@c_WnBZ^vPqB_D]sL","ji@{eTR_KqAk@zJ}]jAdF{Jlx@}DgCnDaO","fa@{t\\fDzIqB~Jo@qHeBy@hBSMqBkCgDuBTZ_DhFfA","hRmnXxCgA}AhQmBo@p@qM","dFkeYbIw@vBoEsEeDyBwKnLaf@`IwGxBmIhBo@TvDdCk@|R{TyAjP{KrJwAdGzB`HpCWdAzCuFzT|@nHyEsEaKrCqJtYpBfCaGdEyBuI?dH}FtIqBsJzC_J","{GwmWjFtH?|TvCZpDsD}C_N~FlJnTiIKvDcD_BTtFcKfBz@bCfOW]rEyJYiCpCaT}FsCiDtAwKkBmM","aFicXtKtB}JjCgFiBnEwC","pc@ktSB|EiIhLwd@zW{UtSl@uLtRwRBkEjKsL`DnAtMuOlPx@","mJw_VxD_FVlFzHx@hC~DvNpAeA\\xAbFeE~HfAlFaBhAKfHkG\\aFbEgJBeCuB^mHiDg@oAeI{ViVlHiNrLtJvGqB","qs@{tWrF_@vDbAkEhAbB|ApFGsBjFoFC}A|B~BpIkHyHxAeAuCeIyCJ|AaDnD_@","we@szNl@lD}C~AcRw@jMgIfGpB","g_A{eWzFbEiCzBiFqBKmBdC^_EsC|DR","_kAkoW|Ew@s@xC|Du@l@~AqGbBy@sByCxBnAuF","srBguVByDtGu@fFjD~HMlB{LvFYiEdFfAr@uB~BOvGeCgAwAvDuGd@`AqAoNuA@wB","e{BrdMj@mOnEeInAhAk@jKdDpCyB`EY`LaAiLaExEm@gD","wsBspT~AjD}@bDkDDmCoLvGxA","imC~pNpNka@rAjUmBeCaApEkDrB}CpTq@iArCxRaG{OrAeO","mmCktVbDtA}H~B{IuGz@yAxLxC","mtEohY|DvA_ApAbDzCy@`CuEoBQwI","}mF_`B`IrAeEtOgB[SmQ","q`Gqx@lCwBfGZt@jDwK`Cs@qE","cgFcpZnKpChB|QdF|GmAdCuCFlCpXrCiErIdCrA~BmA`BsDq@cEnEiLaSScRaJoE|AeCuGwKsF{B_F`@_CuAc@sEvLeBhEvDlEC","asGmb[i@yG~Ek@t@fHdEnDgCxHzEjB@|EeEZyCaBKuEoLuBrGcK","enH|bW_AlLgF~M{Cz@|AgOdJaM","y{Hx}InDdCcAcCh@eCdAdAbAsMpC|@a@kCdFwAnDrA]|E{DJlDfFGvB}AmCo@~DDzQaC}Au@tAwLuJmDeKrDnC","wpIl|XO_EbFz@~CmDuFtJwCXX}A","e|Hy`[`JgEaAfH`HxBjEaEjCBwBvCxCbCc^QeEtBoGQ{AyD}AnA[wArUgE","seIli@vA|RoEaDkEfBaGoQzBuEhM`F","qzIinA`DvBcElFaAeHbB_A","_dJh{\\lAfEqCbCeB_HjAyE|AlD","omJxQxErEYeLtIfFJmErQ_Od@qFxD|BfBoAhGzh@g@hB}FyMoBrJ}@qEkBlBcCe@RiHsB[aDxJeEh@|AjBgHnBoJcFAoK","kyKfsO`Ks^~@pDiCfLpE`NuBdARlGcBmDsI}ANoC","k~KtyA`Cl@fCaFdIp^{ArXwAcEaBrLaByIm@bLaCgC]oHfCuHmBoHc@m[","ubLdyMH~EaBp@oBuAZsIjDvC","c_Lxda@n@eCoCl@\\}OxDgKjBlOlFtA}EhSElLeAjBiAi@n@lF|AyArApB{W?|Iu^|BN","}nLxtQdAzB_C`UsC{HlEaO","azLx{a@JdGiC?p@cNjA|E","kqL|tPjE?{CiG~BoFtCz@dCaE{HaJ{EKj@cQbBkGlEfChBkC`BXjCdK]dNbJtHtCdOrA|C`CLzD|M~EvEdKvA`@cHpIwDe@wGjKyc@\\cPtJ]|KyLmGeGeLtF}A_IuGqIoHvCuCrFqEkFmNxCWuYbGmNNcJbL{@tCgIoBaHyHcI`T{R|BnAtI}ZhDmAdBkF~EO|JdZ@xf@hTj\\gHiNyDmU`BqDdC|DlJaCfAmQaFgExEoCxMva@MvCiDFcDyI\\|O`Ac@bJhVhCZjCkDlCjV?_Jb@nKhJ~DoBzBzE}AjFnDoCk@qF|BtEC]|B|@cCxMqBtX`b@vGEvRyFlI~@@|CeCjBsKdFqFLeEhFxAhEwC`GNjPZrApDkA`@xDuBbVvGbPxDzClHm@lTpCnR{HjFsJoB}MsB}FwIaBkBeShCg@dOdEo@zAhKJ~BpBUuWpCyH`YnAbL_Ih@yCcDuJ`EaP_DiFgIwC]kHqFkI`AyBhC`DtMq@}CcC}EfAqAwF{Ck@`I}ISgKpBkGoBqBOgNz@hD|AcApBwH~C_@rByHtKeKh@}RvHoOjMaD^kBnHpCz@}@^aJfEGcCwC`EeQbFaA}@gF`BoTdKgP`AcItLmDjInAjXbU`]vBlXlIlEpEjArOrHvQdEhDlPlAxb@v]zA`N}DxLfBLjD}F`IwA~F~DjBfHTlRpJe@dAvBDxMfE[CsFfB{@zDvIrHlAdBvItCx@zDcKpDdAfOtRbIeElBzOxD^yHrWmUbCyIgHy@lHqD}DkIcAdA}E}KgBs@dCxF|@]|BwW}EcLhAGsAk\\yIgUHsFsBgp@uCyGh@eExE}Ol[sm@lVqEhHyA_A}D~A_LgIqAnFmFGmJgDyBuFyFuAsFcG}ZpEyBrGfDvDjB_B`ApDwB`@}BhNgIdHhBXiAlBgFHkJfKmAc@}BjVeMrTlBtJoOjj@kIlKeHk@mGvCse@ve@{LvD}BdIfIUpj@w_@hAvB_KlL}FVuIfPiDsDeEnGyTbJcErFsBbLsb@rVkNXeP}BsO|CZyHzDiB{Jp@mJv[kHpAuA~F_Db@cKrOkOdLQ|NiGfSkGfl@h@|EhCg@bDbVyH}@{@sEq@t@`KfT`BqClCzDnLfY|Hvf@yRek@mGgCbBrKaCbGnA`I_ESa@dKsIjMiIwH{BuV}BtCmAsCbAbYsFtRuDwU?cDbBZGeL_Mv^gBoBaB}Q_E{FmEi`@bC_MlBebAxFik@aG}h@pAgCkCaEfE{MgCkGvCYoAsPvGin@bBvGOm`@vBuEeByEsAjEcA_C]sKdFk\\YyQ{BVc@qDbAuH|D@_D_CDaDiEyAkE~L{EOqCkFvBqM`FoG`BpDf@sJ","_hMphU|AbB}@}LdBuGeBaFdGyIsAcBkElC@wJpA_FnI{D`EwTvATNfIjA_ChAbAuA`U~B|l@{GdXqAw]a@fa@iAhBoAoMq@pSeFqHqAcV","{gMb|MfAtRuBtGuAiBTiMlBwI","ghM~{O|B}CaDwDqAyNlEwIbC\\iCiQbEmUvAYm@sJlEqTjGkJ|AnJrJoj@rJ|KuGnPXbGpBVdGsPdEaCnCbAwEpVjJiOcEh]aJxVxA~PcAhDsCcC[sWgA`AeHgIyAv@gFrWs@_CkE`Pf@jd@wAjVeAdD{AoE?zGkE~@qDyCeCqU~BpC","olMfrRNsQx@s@~AxDtAmHrDb@z@fOeFzRg@{KaCzE_BkF","qhMo`[_@jVaBwL`CsH","yeMneQtCtEGbFsGxBiCoHt@}WxExO","g}LzoVbBlOaEvPiJmKyBbER_m@lCyK~DdV~EvF","gtMam\\lAdF_BrTPy[","ssM`hQlAlBcArOoCiKdCwF","gwMyi[rC|Ch@j`@aClKiCkBe@gGrBcf@","o~MrfRzAwCzFrAoBbZ{CLkAmX","g{MhcTl@qM`Bc@|AxBtB|c@{@hIwA_LK~c@{FmMhEqf@_E|GgAwDtBqG","_yLsfJGbWmC~KkBZcIqQWvDoD}MyAt@iFsa@iCuj@nAiC|Lx_AbKbRdDg@bD_K","{`NvnQ~@eR`AmDjAl@zAcJSkq@|CcG~AfLOxo@_ArOoE|AwAfEuAdSqAiAJ}K","idNfuUxCZdAxCpAzb@uGmV[cQ","a`Nq{S`Bu@m@_WjDaRfBn@dF`[f@sU~BeBqAwKzCun@yCK`@gVhBaI~B{ArAtBlFuPqE_ExAaISqd@yDnCuAgG`Cmw@nGuTEud@rAeDpCVv@uF[cj@pD{I_AwF_C`DyAwAj@}_@vDwYzW?hAdOdIgKfCZk@tJlD~U`J|SiC|GzCfOiAzAx@jMdInHzBiFbHXFxDdDtAtAsAfB|IbFdAn@hHjEz@xD~GiZnGuG_BsEsDm@uHgRe`@yG_DNpFdDvBzEzNuFbDbAbOlIrNxBcDhApVoCM_@vHbBvFVrf@|Ydk@XyHfDcHuA{IzEaHhDEfEzClPjBjLnJdQ|StBhG}AzFjGlMrEr@~ErLlBZdN}KrIhAhCfOsMhA_@sCkDhCgAbH_HyBkApElEbSoH_FiBhBrIjOHbEzAdB`GsGx@}CmC_FrAsHfB_@v@zGzIdKlBwEtOoIrCBt@|BhDeD~HpAPlBlUlN`JhPrGz^rEdAJlB_FD_AjGhKnOhCj@rVcSpJ{A~IZdRfXgGNmCzHwHtDwA~I{C]?nD`YnDDaCbJuB|JsNlY}FJlCqHhLcVbG_K|HtB^yUsAia@~HrFdJaAjFqLYo[bQGvD`El@bApSlG~AdC~GfQ|PbCtJra@zA|MnMyD|Dik@bRq`@rD~AnLqFdGgA_BmAx@{E|JiHtEdAl]cCrXwGtDbC`JuG~RgMvG`@lLhMgDfEkGbKcC{Fg@h@sBbJg@S{LgMuMnLaBdCwJzFwE|KjKbGZtIbNhD~PzCj@~HxTnGn_@aOnDwHIg[|T_N`CwBhEqVtM?bB_Hy@pJfEwLjH~c@mSdD^zEkGdTyBxByD~KkD`UiX`CvBbGyJ{Hsg@rGJbg@tSli@vm@dLrEfJnAfA_ChIp@fMaGnW{@tKhGlDvKtLjOpWcDrK~Q`BeAxNnCbXzWhFfNO`S~DlQgCvFqHxA}Dy@q[xQc^|DgXlNgM@mVqJeGKqb@`JqWnRcYgEcCnAoErDdBfOqKxHXjN|G|V{AxOdD|PaBfHeNlTsU`NaG`J}GRaFtDyGgFiK}@sVbDgZyN_Vo]yFp@sGeBuH}MiIcEtBoV_HwUsCgq@VkCdBDc@wD`BbBlCcA|JvBnHu]pD{A|EcToC_EyFOwByGhKam@iC}K|BcEGiJsB}CiR_HqK_@]`HhCvLiB`DbBnKgBzKuHfG{C_B}A|B_E}EGsHwCsAX}JyDwMCkIxE{RKsK}DiGiCp@eOx\\gEuHoAnB{BaHdE~XzBKb@mHfAf@tChNg@lB}Ak@{@zEgBcFm@x@cB|NrH~EX|CpMhFpHcFHlFhDzFeCz@Y`Fr@rFnBkC`@dB{@|FfOyGs@vDdBy@R|BpDiA@bCwAbDcHlBcKtIeHYeJ~TyH~Ev@|D}C@]~CfA`D`Gs@hL}N?}CrAFpGeOfAd@}BzG~BrAjAoCfBVtD|DNrAqEuAyEjCiIrSuF~HeE|@yAdGvFvMHlTlFJnD|LrIxEpBmA|KbMAzLpChEeEbFLzMwGK}AhCsKwCeMzBoCyG`A_e@wBgBmKe@wH`JmApHoCRFqQcF|@tA{D{CqMcD{@eCuLeHoDwAiTaBgCkHfC}HsA{BwKfD`AtAcCdEzFlDy@tBgE{A{HlC_IyE{TrAwKwCaI}Hb@}BaBcA{DrC_DC_DmG}@m@fEsBPy@_\\mBcF}ApE`Cn_@mDtHeEk@sD~AsB_B_KcWsDjHx@vIhC`EzB_@jI~TxGpCzFmI`FvDl@nEjO|DSpF|CpBHfFuXbOfFjKl@hGeBrGcTfCwNsa@wSmYqKsZkA_WeDqH_@sUrCoRr@~F|ByEeAmEhDkZ~Hm[dCM|CdP}Bn_@pCeIhHYnB}KyD`BgAcCzBaNo@iDsCfCcEqMpAsJiCsBuBdDwBaB{BrC~@oPnBqBVzFnB?bA}CuLam@HuCxBbEgCe`@vBcFcCcFsBpEaAgB~Iwp@iBeCeD`M_BaA{EpBsDqJuDcCJeTnBi@`D|DjE{DpGl@xB}E`L|M\\cF}HmOqBrBcC}AOzEoBn@gE_DcDbGeCeJmCl@hBkE~DlAd@uEoCzAoAoIfBoWeDpDuERy@mf@gB`DcCgFeG}sAkDuFqAwM`AwIn@nG^cM","sdNtoTEzSu@_Vz@bA","qeNoyC`@|Ws@iC}@xBg@}KvBoJ","{fN|uQChM}CdBxAeRfAt@","ohNjpRpAmA}Ala@{@aE{B~FbE}`@","mhNwoSlAfb@}GqO~BoSnAx@","cqNaqBrCqSnAtN|I|JFpFyBlLgAuDaFpT{CzCoA}g@dA{F","quNa~CdAgKbClZwDhb@Qoq@","mvNs~HjBdUo@xE}@qBEzLUuh@\\jA","_lNsoR_@`^cGtVuDw\\dHqYrDp@","{pNz~O~@qF~Ed^W~KqAtE}B_D@jJ}CzIcDaNm@vAIqMzDw[bC}C","mfObkL~Aqh@`Fhc@AsLtIrb@~Axb@VsGb@hC`BeDfGhZtAuJvBtOy@xv@_BXm@qJoC`BfAoSeDrQcE}PsDnJi@w^K|b@qG|WwCae@`AoMkBwCu@mRBqbA","_iOjhD|Caf@hB`dA|Am|@rBzEwCgm@zBgU|E~o@HoMrGhK|EE`CoFfA`ShBqJhDm@PtEjDcGNzLnAgFfA`A\\pP`F}F]pNjDsO`DkAd@dJ_EnKfCcAfBfFRaXjIv`@dAdX~GbNrF`b@jKrG~CdIzCoAfJ~DwCn]iP`TuH`CwDrGsCgAeAdCiFeEiAkHoFyB`CdOaArFqF_Ap@qQwEvZ{D}EiQdWsBvOFdl@}DbQiA_\\cCzg@mA[_Eqm@iAmAgAzOoFec@yArAsA_a@z@aYmBqOzCuc@kBzMuA[wD{q@D_gA"];
+/* ====================================================================== */
+
+(function(){
+"use strict";
+var SVGNS = "http://www.w3.org/2000/svg";
+var ARROW = {N:"\u2191",NE:"\u2197",E:"\u2192",SE:"\u2198",S:"\u2193",SW:"\u2199",W:"\u2190",NW:"\u2196"};
+var ROSE = [["NW","N","NE"],["W",null,"E"],["SW","S","SE"]];
+
+/* ---------- polyline decode (precision 100) ---------- */
+function decode(str){
+  var pts=[], i=0, lat=0, lon=0;
+  while(i<str.length){
+    var shift, result, b, d, k;
+    for(k=0;k<2;k++){
+      shift=0; result=0;
+      do{ b=str.charCodeAt(i++)-63; result|=(b&0x1f)<<shift; shift+=5; }while(b>=0x20);
+      d = (result&1) ? ~(result>>1) : (result>>1);
+      if(k===0) lat+=d; else lon+=d;
+    }
+    pts.push([lon/100, lat/100]);
+  }
+  return pts;
+}
+
+var PLATES = PLATE_DATA.map(function(p){
+  return {id:p.id, name:p.name, aliases:p.aliases, vectors:p.vectors,
+          rings:p.rings.map(decode)};
+});
+var MINOR = MINOR_DATA.map(function(m){
+  return {name:m.name, rings:m.rings.map(decode)};
+});
+var LAND = LAND_DATA.map(decode);
+var MIN_GUESSES = PLATES.reduce(function(s,p){ return s+1+p.vectors.length; },0);
+var TOTAL_VEC = PLATES.reduce(function(s,p){ return s+p.vectors.length; },0);
+
+/* ---------- projection ---------- */
+var VW=1000, VH=500;
+function px(lon){ return (lon+180)/360*VW; }
+function py(lat){ return (90-lat)/180*VH; }
+function pathOf(rings){
+  return rings.map(function(r){
+    return r.map(function(c,i){ return (i?"L":"M")+px(c[0]).toFixed(1)+","+py(c[1]).toFixed(1); }).join("")+"Z";
+  }).join("");
+}
+// Bird (2003) and Natural Earth clip their polygons at the antimeridian,
+// so a ring can include a straight closing edge that runs along lon=+-180
+// purely as a data-boundary artifact, not a real coastline/plate boundary.
+// That was invisible when the map only ever showed one copy of the world
+// (the artifact sat exactly at the map's own border), but with the map
+// tiled for infinite scroll that same edge can land mid-screen. The FILL
+// still uses the untouched ring (the shape is geometrically correct), but
+// the STROKE skips any segment whose both endpoints sit on the same side
+// of the seam, so the fabricated edge is never drawn as a visible line.
+function isSeamLon(lon){ return Math.abs(Math.abs(lon)-180) < 0.05; }
+function strokePath(rings){
+  var out="";
+  rings.forEach(function(r){
+    var n=r.length;
+    if(n<2) return;
+    var segs=[[r[0]]];
+    for(var i=1;i<n;i++){
+      var a=r[i-1], b=r[i];
+      var seam = isSeamLon(a[0]) && isSeamLon(b[0]) && ((a[0]>0)===(b[0]>0));
+      if(seam) segs.push([b]);
+      else segs[segs.length-1].push(b);
+    }
+    segs.forEach(function(seg){
+      if(seg.length<2) return;
+      out += seg.map(function(c,i){ return (i?"L":"M")+px(c[0]).toFixed(1)+","+py(c[1]).toFixed(1); }).join("");
+    });
+  });
+  return out;
+}
+
+/* ---------- text matching ---------- */
+function norm(s){
+  return s.toLowerCase().replace(/plate/g,"").replace(/[^a-z ]/g,"").replace(/\s+/g," ").trim();
+}
+function lev(a,b){
+  var m=a.length,n=b.length,prev=[],cur=[],i,j;
+  for(j=0;j<=n;j++) prev[j]=j;
+  for(i=1;i<=m;i++){
+    cur[0]=i;
+    for(j=1;j<=n;j++){
+      cur[j] = a.charAt(i-1)===b.charAt(j-1) ? prev[j-1]
+             : 1+Math.min(prev[j-1],prev[j],cur[j-1]);
+    }
+    prev=cur.slice();
+  }
+  return prev[n];
+}
+function matches(input, plate){
+  var q=norm(input); if(!q) return false;
+  var cands=[norm(plate.name)].concat(plate.aliases.map(norm));
+  return cands.some(function(c){
+    if(c===q) return true;
+    // global edit budget, but the leading word must be near-exact so that
+    // "south american" can never be accepted as "north american"
+    var tol=Math.min(2, Math.max(1, Math.floor(c.length/7)));
+    if(lev(q,c) > tol) return false;
+    var cw=c.split(" ")[0], qw=q.split(" ")[0];
+    // short leading words stay strict (north/south differ by 2 edits);
+    // long ones absorb ordinary misspellings ("phillipine")
+    return lev(qw, cw) <= (cw.length>=8 ? 2 : 1);
+  });
+}
+function shuffle(a){
+  a=a.slice();
+  for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; }
+  return a;
+}
+
+/* ---------- persistence (graceful if unavailable) ---------- */
+var memStore={};
+var hasStore = typeof window!=="undefined" && window.storage && typeof window.storage.get==="function";
+function key(m){ return "platedrill-v2-"+m; }
+function loadProgress(mode){
+  if(!hasStore) return Promise.resolve(memStore[mode]||{done:[],guesses:0});
+  return window.storage.get(key(mode),false)
+    .then(function(r){ return r&&r.value ? JSON.parse(r.value) : {done:[],guesses:0}; })
+    .catch(function(){ return memStore[mode]||{done:[],guesses:0}; });
+}
+function saveProgress(mode,val){
+  memStore[mode]=val;
+  if(!hasStore) return Promise.resolve();
+  return window.storage.set(key(mode),JSON.stringify(val),false).catch(function(){});
+}
+function wipeProgress(mode){
+  delete memStore[mode];
+  if(!hasStore) return Promise.resolve();
+  return window.storage.delete(key(mode),false).catch(function(){});
+}
+
+/* ---------- theme ---------- */
+var THEME_KEY="platedrill-theme";
+var themePref="auto";
+var mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
+function applyTheme(){
+  var resolved = themePref==="auto" ? ((mq && mq.matches) ? "light" : "dark") : themePref;
+  document.documentElement.setAttribute("data-theme", resolved);
+}
+if(mq){
+  var onChange=function(){ if(themePref==="auto") applyTheme(); };
+  if(mq.addEventListener) mq.addEventListener("change", onChange);
+  else if(mq.addListener) mq.addListener(onChange);
+}
+function loadTheme(){
+  var fallback=function(){ themePref = memStore[THEME_KEY] || "auto"; applyTheme(); };
+  if(!hasStore){ fallback(); return Promise.resolve(); }
+  return window.storage.get(THEME_KEY,false).then(function(r){
+    themePref = (r && r.value) || "auto"; applyTheme();
+  }).catch(function(){ fallback(); });
+}
+function setTheme(v){
+  themePref=v; memStore[THEME_KEY]=v; applyTheme();
+  if(hasStore) window.storage.set(THEME_KEY,v,false).catch(function(){});
+}
+
+/* ---------- state ---------- */
+var S = {
+  pickMode:"find", pickRun:"practice",
+  mode:null, run:null,
+  queue:[], plate:null, stage:null,
+  solved:[], sel:0,
+  roundGuesses:0, done:[], totalGuesses:0, practiceDone:0, last:null,
+  view:{k:1,x:0,y:0}
+};
+var app=document.getElementById("app");
+var svg=null, gRoot=null, gMark=null, markLayers=null;
+
+/* ---------- menu ---------- */
+function menu(){
+  Promise.all([loadProgress("find"),loadProgress("name")]).then(function(r){
+    drawMenu(r[0],r[1]);
+  });
+}
+function drawMenu(findP,nameP){
+  var prog = S.pickMode==="find" ? findP : nameP;
+  var resume="";
+  if(S.pickRun==="goal"){
+    if(!prog.done.length) resume='<div class="note">Nothing saved yet — this starts a fresh run.</div>';
+    else if(prog.done.length>=PLATES.length) resume='<div class="note">Previous run finished in '+prog.guesses+
+      ' guesses. Starting will begin a new run.</div><button class="link" id="wipe">Clear saved progress</button>';
+    else resume='<div class="note">Resuming: '+prog.done.length+' of '+PLATES.length+' plates cleared, '+
+      prog.guesses+' guesses so far.</div><button class="link" id="wipe">Clear saved progress</button>';
+  }
+  app.innerHTML =
+  '<div class="eyebrow">Plate Drill</div>'+
+  '<h1>Tectonic plates &amp; their motion</h1>'+
+  '<p>'+PLATES.length+' plates, '+TOTAL_VEC+' motion arrows. A perfect run takes '+MIN_GUESSES+' guesses.</p>'+
+  '<div class="card">'+
+    '<h3>Quiz type</h3>'+
+    '<div class="pair">'+
+      '<button class="btn '+(S.pickMode==="find"?"on":"")+'" data-k="pickMode" data-v="find">Find<span class="sub">name given &middot; tap the plate</span></button>'+
+      '<button class="btn '+(S.pickMode==="name"?"on":"")+'" data-k="pickMode" data-v="name">Name<span class="sub">plate lit &middot; type the name</span></button>'+
+    '</div>'+
+    '<h3>Session</h3>'+
+    '<div class="pair">'+
+      '<button class="btn '+(S.pickRun==="practice"?"on":"")+'" data-k="pickRun" data-v="practice">Practice<span class="sub">endless, untracked</span></button>'+
+      '<button class="btn '+(S.pickRun==="goal"?"on":"")+'" data-k="pickRun" data-v="goal">Goal<span class="sub">lock in every plate</span></button>'+
+    '</div>'+
+    resume+
+    '<button class="btn primary block" id="go" style="margin-top:10px">Start</button>'+
+  '</div>'+
+  '<div class="card">'+
+    '<h3>How a round works</h3>'+
+    '<p>Identify the plate, then fill in its motion. Each amber square marks a point on the plate; tap a square, then tap a compass direction. A plate can carry up to three arrows &mdash; plates rotate, so motion is not the same everywhere on one plate.</p>'+'<p>In goal mode a plate only locks in if you get its location <em>and</em> every arrow right on the first try. Any slip and it returns to the queue. Locked plates stay tinted blue on the map.</p>'+
+    '<div class="key">'+
+      '<span><span class="swatch" style="background:var(--plate)"></span>quizzed plate</span>'+
+      '<span><span class="swatch" style="background:var(--minor)"></span>minor plate (not quizzed)</span>'+
+      '<span><span class="swatch" style="background:var(--magma)"></span>current</span>'+
+      '<span><span class="swatch" style="background:var(--jade)"></span>correct</span>'+'<span><span class="swatch" style="background:var(--locked)"></span>locked in</span>'+
+    '</div>'+
+  '</div>'+
+  '<div class="card">'+
+    '<h3>About the data</h3>'+
+    '<p>Boundaries follow Bird (2003), simplified for legibility. Arrows are absolute plate motion from NNR&#8209;MORVEL56 (Argus, Gordon &amp; DeMets 2011) in the no&#8209;net&#8209;rotation frame, snapped to the nearest of eight compass points. Motion <em>relative to a neighbouring plate</em> at a boundary can point somewhere else entirely &mdash; South America drifts away from Africa, yet its absolute motion is slow and northward.</p>'+
+    '<p>NNR&#8209;MORVEL56 actually covers 56 plates; only '+PLATES.length+' are quizzed here. The grey ones aren&rsquo;t geologically unimportant &mdash; some (Amur, Okhotsk, Yangtze) are genuinely large and are included; most of the rest are small blocks along plate margins (Aegean Sea, Burma, Molucca Sea, and the like) left as map context rather than quiz material, purely to keep a round of the game a reasonable length.</p>'+
+    '<div class="themebar">'+
+      '<span class="tglab">Theme</span>'+
+      '<button data-th="auto" class="'+(themePref==="auto"?"on":"")+'">Auto</button>'+
+      '<button data-th="light" class="'+(themePref==="light"?"on":"")+'">Light</button>'+
+      '<button data-th="dark" class="'+(themePref==="dark"?"on":"")+'">Dark</button>'+
+    '</div>'+
+  '</div>';
+
+  Array.prototype.forEach.call(app.querySelectorAll("[data-th]"), function(b){
+    b.addEventListener("click", function(){
+      setTheme(b.getAttribute("data-th"));
+      drawMenu(findP,nameP);
+    });
+  });
+
+  Array.prototype.forEach.call(app.querySelectorAll("[data-k]"), function(b){
+    b.addEventListener("click", function(){
+      S[b.getAttribute("data-k")] = b.getAttribute("data-v");
+      drawMenu(findP,nameP);
+    });
+  });
+  var w=document.getElementById("wipe");
+  if(w) w.addEventListener("click", function(){ wipeProgress(S.pickMode).then(menu); });
+  document.getElementById("go").addEventListener("click", start);
+}
+
+/* ---------- session ---------- */
+function start(){
+  S.mode=S.pickMode; S.run=S.pickRun; S.last=null;
+  var next=function(){
+    var remaining=PLATES.map(function(p){return p.id;}).filter(function(id){ return S.done.indexOf(id)<0; });
+    S.queue=shuffle(remaining);
+    S.view={k:1,x:0,y:0};
+    round();
+  };
+  if(S.run==="goal"){
+    loadProgress(S.mode).then(function(p){
+      if(p.done.length>=PLATES.length){ S.done=[]; S.totalGuesses=0; return wipeProgress(S.mode); }
+      S.done=p.done.slice(); S.totalGuesses=p.guesses;
+    }).then(next);
+  } else {
+    S.done=[]; S.totalGuesses=0; S.practiceDone=0; next();
+  }
+}
+
+function round(){
+  if(!S.queue.length){
+    if(S.run==="goal"){ finish(); return; }
+    S.queue=shuffle(PLATES.map(function(p){return p.id;}));
+  }
+  var id=S.queue[0];
+  S.plate=PLATES.filter(function(p){return p.id===id;})[0];
+  S.stage="identify";
+  S.solved=S.plate.vectors.map(function(){return false;});
+  S.sel=0;
+  S.roundGuesses=0;
+  drawGame();
+}
+
+/* ---------- game shell ---------- */
+function drawGame(){
+  app.innerHTML =
+  '<div class="top">'+
+    '<div><div class="tag">'+(S.mode==="find"?"Find this plate":"Name the lit plate")+'</div>'+
+      '<div class="subject" id="subject">'+(S.mode==="find"?S.plate.name:"\u2014")+'</div></div>'+
+    '<div class="hud" id="hud"></div>'+
+  '</div>'+
+  '<div class="mapbox">'+
+    '<svg id="map" viewBox="0 0 '+VW+' '+VH+'"></svg>'+
+    '<button id="zreset" class="zreset" aria-label="Reset view">Reset</button>'+
+  '</div>'+
+  '<div class="status dim" id="status"></div>'+
+  '<div id="recall"></div>'+
+  '<div id="panel"></div>'+
+  '<div class="foot">'+
+    '<button class="btn" id="back">\u2190 Menu</button>'+
+    '<button class="btn" id="skip">Skip plate</button>'+
+  '</div>';
+
+  buildMap();
+  document.getElementById("back").addEventListener("click", menu);
+  document.getElementById("skip").addEventListener("click", function(){
+    S.queue.push(S.queue.shift()); round();
+  });
+  document.getElementById("zreset").addEventListener("click", function(){ S.view={k:1,x:0,y:0}; applyView(); });
+  S.done.forEach(function(id){ light(id,"locked"); });
+  if(S.mode==="name") light(S.plate.id,"lit");
+  hud(); recall(); panel();
+}
+
+function el(tag, attrs){
+  var n=document.createElementNS(SVGNS, tag);
+  if(attrs) for(var k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+}
+
+var WORLD_COPIES=[-1,0,1];   // one spare on each side is enough at every zoom level (see wrap math in clampView)
+
+function buildMap(){
+  svg=document.getElementById("map");
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  svg.appendChild(el("rect",{x:0,y:0,width:VW,height:VH,class:"mapbase"}));
+  gRoot=el("g",{id:"root"});
+  svg.appendChild(gRoot);
+
+  WORLD_COPIES.forEach(function(m){
+    var gw=el("g",{transform:"translate("+(m*VW)+",0)"});
+
+    var gMinor=el("g");
+    MINOR.forEach(function(mp){
+      var f=el("path",{d:pathOf(mp.rings),class:"minor-fill"});
+      f.setAttribute("data-minor", mp.name);
+      f.setAttribute("data-hit","1");
+      gMinor.appendChild(f);
+      gMinor.appendChild(el("path",{d:strokePath(mp.rings),class:"minor-stroke","vector-effect":"non-scaling-stroke"}));
+    });
+    gw.appendChild(gMinor);
+
+    var gPlates=el("g");
+    PLATES.forEach(function(pl){
+      pl.rings.forEach(function(r){
+        var f=el("path",{d:pathOf([r]),class:"plate-fill"});
+        f.setAttribute("data-plate", pl.id);
+        f.setAttribute("data-hit","1");
+        gPlates.appendChild(f);
+        var s=el("path",{d:strokePath([r]),class:"plate-stroke","vector-effect":"non-scaling-stroke"});
+        s.setAttribute("data-plate", pl.id);
+        gPlates.appendChild(s);
+      });
+    });
+    gw.appendChild(gPlates);
+
+    // geographic reference, drawn over the plates and inert to taps
+    var gGrid=el("g");
+    for(var lon=-150;lon<=150;lon+=30)
+      gGrid.appendChild(el("line",{x1:px(lon),y1:0,x2:px(lon),y2:VH,
+        class:"grid","vector-effect":"non-scaling-stroke"}));
+    for(var lat=-60;lat<=60;lat+=30)
+      gGrid.appendChild(el("line",{x1:0,y1:py(lat),x2:VW,y2:py(lat),
+        class:"grid"+(lat===0?" eq":""),"vector-effect":"non-scaling-stroke"}));
+    gw.appendChild(gGrid);
+
+    var gLand=el("g");
+    gLand.appendChild(el("path",{d:pathOf(LAND),class:"land-fill"}));
+    gLand.appendChild(el("path",{d:strokePath(LAND),class:"land-casing","vector-effect":"non-scaling-stroke"}));
+    gLand.appendChild(el("path",{d:strokePath(LAND),class:"land","vector-effect":"non-scaling-stroke"}));
+    gw.appendChild(gLand);
+
+    gRoot.appendChild(gw);
+  });
+
+  // markers sit above every copy of the map, replicated so a marker is
+  // reachable no matter which copy the person has scrolled to
+  gMark=el("g",{id:"marks"});
+  markLayers=WORLD_COPIES.map(function(m){
+    var g=el("g",{transform:"translate("+(m*VW)+",0)"});
+    gMark.appendChild(g);
+    return g;
+  });
+  gRoot.appendChild(gMark);
+
+  applyView();
+  wireGestures();
+}
+
+function light(id, cls){
+  Array.prototype.forEach.call(svg.querySelectorAll('[data-plate="'+id+'"]'), function(n){
+    n.classList.add(cls);
+  });
+}
+function unlight(id, cls){
+  Array.prototype.forEach.call(svg.querySelectorAll('[data-plate="'+id+'"]'), function(n){
+    n.classList.remove(cls);
+  });
+}
+function blink(id, cls){
+  light(id,cls);
+  setTimeout(function(){ unlight(id,cls); }, 480);
+}
+
+/* ---------- view transform ---------- */
+function applyView(){
+  var v=S.view;
+  gRoot.setAttribute("transform","translate("+v.x+","+v.y+") scale("+v.k+")");
+  drawMarks();
+  var rb=document.getElementById("zreset");
+  if(rb) rb.classList.toggle("show", v.k>1.001);
+}
+function clampView(){
+  var v=S.view;
+  if(v.k<1) v.k=1;
+  if(v.k>14) v.k=14;
+  var minY=VH-VH*v.k;
+  if(v.y>0) v.y=0; if(v.y<minY) v.y=minY;
+  // Left-right is seamless: three copies of the map are rendered side by
+  // side, so wrapping the translation into one map-width lets the drag
+  // continue forever while only ever needing those three copies on screen.
+  var period=VW*v.k;
+  v.x = v.x % period;
+  if(v.x>0) v.x -= period;
+}
+function zoomAt(cx, cy, factor){
+  var v=S.view;
+  var k0=v.k, k1=Math.max(1, Math.min(14, k0*factor));
+  v.x = cx - (cx - v.x)*(k1/k0);
+  v.y = cy - (cy - v.y)*(k1/k0);
+  v.k = k1;
+  clampView(); applyView();
+}
+function toView(clientX, clientY){
+  var r=svg.getBoundingClientRect();
+  return {x:(clientX-r.left)/r.width*VW, y:(clientY-r.top)/r.height*VH};
+}
+
+function wireGestures(){
+  // touch-action:none covers modern browsers, but older iOS Safari still
+  // scrolls the page on a one-finger drag, so cancel the touch defaults too.
+  svg.addEventListener("touchmove", function(e){
+    if(e.cancelable) e.preventDefault();
+  }, {passive:false});
+
+  if(!window.PointerEvent){           // fallback: taps only, no pan/zoom gestures
+    svg.addEventListener("click", function(e){ tap(e.clientX, e.clientY); });
+    return;
+  }
+  var pts={}, last=null, moved=0, downAt=0, startPt=null;
+  function ids(){ return Object.keys(pts); }
+
+  svg.addEventListener("pointerdown", function(e){
+    if(e.cancelable) e.preventDefault();   // suppress scroll/selection start
+    svg.setPointerCapture(e.pointerId);
+    pts[e.pointerId]=toView(e.clientX,e.clientY);
+    if(ids().length===1){
+      last=pts[e.pointerId]; moved=0; downAt=Date.now();
+      startPt={x:e.clientX,y:e.clientY};
+    } else { last=null; }
+  }, {passive:false});
+
+  svg.addEventListener("pointermove", function(e){
+    if(!(e.pointerId in pts)) return;
+    if(e.cancelable) e.preventDefault();
+    var now=toView(e.clientX,e.clientY);
+    var list=ids();
+    if(list.length===1 && last){
+      // how far this finger has strayed from its down-point, at most —
+      // NOT summed across events. Touchscreens fire several pointermove
+      // events even for a near-stationary tap (a few px of sensor jitter);
+      // summing distance-from-start on each one made ordinary taps rack up
+      // "moved" past the threshold and get misread as drags.
+      var strayed = Math.abs(e.clientX-startPt.x)+Math.abs(e.clientY-startPt.y);
+      if(strayed>moved) moved=strayed;
+      S.view.x += now.x-last.x;
+      S.view.y += now.y-last.y;
+      clampView(); applyView();
+      last = now;
+    } else if(list.length===2){
+      var a=pts[list[0]], b=pts[list[1]];
+      var prevD=Math.hypot(a.x-b.x, a.y-b.y);
+      pts[e.pointerId]=now;
+      a=pts[list[0]]; b=pts[list[1]];
+      var newD=Math.hypot(a.x-b.x, a.y-b.y);
+      if(prevD>0.01 && newD>0.01){
+        zoomAt((a.x+b.x)/2,(a.y+b.y)/2, newD/prevD);
+      }
+      moved=99;
+      return;
+    }
+    pts[e.pointerId]=now;
+  }, {passive:false});
+
+  function up(e){
+    if(!(e.pointerId in pts)) return;
+    var wasSingle = ids().length===1;
+    // also check the actual net displacement at release, in case this
+    // pointerup arrived without a single pointermove in between (some
+    // browsers coalesce short taps that way) and "moved" never got set
+    var released = Math.abs(e.clientX-startPt.x)+Math.abs(e.clientY-startPt.y);
+    var strayEnough = Math.max(moved, released);
+    delete pts[e.pointerId];
+    if(wasSingle && strayEnough<18 && Date.now()-downAt<600){
+      tap(e.clientX, e.clientY);
+    }
+    last=null;
+  }
+  svg.addEventListener("pointerup", up);
+  svg.addEventListener("pointercancel", function(e){ delete pts[e.pointerId]; last=null; });
+
+  svg.addEventListener("wheel", function(e){
+    e.preventDefault();
+    var v=toView(e.clientX,e.clientY);
+    zoomAt(v.x, v.y, e.deltaY<0 ? 1.18 : 1/1.18);
+  }, {passive:false});
+}
+
+/* ---------- tap routing ---------- */
+function tap(clientX, clientY){
+  var target=document.elementFromPoint(clientX, clientY);
+  if(!target) return;
+  var mk = target.closest ? target.closest("[data-vec]") : null;
+  if(mk){ selectMark(parseInt(mk.getAttribute("data-vec"),10)); return; }
+  var hit = target.closest ? target.closest("[data-plate],[data-minor]") : null;
+  if(!hit) return;
+  if(S.stage!=="identify" || S.mode!=="find") return;
+  if(hit.hasAttribute("data-minor")){
+    S.roundGuesses++;
+    say(hit.getAttribute("data-minor")+" plate \u2014 a minor plate, not one of the "+PLATES.length+" in this drill.","bad");
+    hud(); return;
+  }
+  judgeIdentify(hit.getAttribute("data-plate")===S.plate.id, hit.getAttribute("data-plate"));
+}
+
+/* ---------- markers ---------- */
+function drawMarks(){
+  if(!markLayers) return;
+  markLayers.forEach(function(layer){
+    while(layer.firstChild) layer.removeChild(layer.firstChild);
+  });
+  var inv = 1/S.view.k;
+
+  // Arrows stay on the map permanently once a plate locks in for a goal
+  // run -- purely decorative (no data-vec, no pointer events), since these
+  // are already-solved history, not something to interact with again.
+  if(S.run==="goal" && S.done.length){
+    markLayers.forEach(function(layer){
+      S.done.forEach(function(pid){
+        var plate=null;
+        for(var i=0;i<PLATES.length;i++){ if(PLATES[i].id===pid){ plate=PLATES[i]; break; } }
+        if(!plate) return;
+        plate.vectors.forEach(function(v){
+          var g=el("g",{transform:"translate("+px(v.lon)+","+py(v.lat)+") scale("+inv+")"});
+          g.style.pointerEvents="none";
+          g.appendChild(el("circle",{r:14,class:"mk-done"}));
+          var t=el("text",{x:0,y:0,dy:".36em","text-anchor":"middle",class:"mk-glyph"});
+          t.textContent=ARROW[v.dir];
+          g.appendChild(t);
+          layer.appendChild(g);
+        });
+      });
+    });
+  }
+
+  if(S.stage!=="motion") return;
+  markLayers.forEach(function(layer){
+    S.plate.vectors.forEach(function(v,i){
+      var g=el("g",{transform:"translate("+px(v.lon)+","+py(v.lat)+") scale("+inv+")"});
+      g.setAttribute("data-vec", String(i));
+      g.setAttribute("data-hit","1");
+      g.style.cursor="pointer";
+      g.appendChild(el("circle",{r:24,class:"mk-hit"}));
+      if(S.solved[i]){
+        g.appendChild(el("circle",{r:14,class:"mk-done"}));
+        var t=el("text",{x:0,y:0,dy:".36em","text-anchor":"middle",class:"mk-glyph"});
+        t.textContent=ARROW[v.dir];
+        g.appendChild(t);
+      } else {
+        g.appendChild(el("rect",{x:-11,y:-11,width:22,height:22,rx:5,
+          class:"mk-box"+(S.sel===i?" sel":"")}));
+        if(S.plate.vectors.length>1){
+          var n=el("text",{x:0,y:-16,"text-anchor":"middle",class:"mk-num"});
+          n.textContent=String(i+1);
+          g.appendChild(n);
+        }
+      }
+      layer.appendChild(g);
+    });
+  });
+}
+function selectMark(i){
+  if(S.stage!=="motion" || S.solved[i]) return;
+  S.sel=i; drawMarks(); panel();
+}
+function firstUnsolved(){
+  for(var i=0;i<S.solved.length;i++) if(!S.solved[i]) return i;
+  return -1;
+}
+
+/* ---------- panels ---------- */
+function recall(){
+  var n=document.getElementById("recall");
+  if(!n) return;
+  if(!S.last){
+    n.innerHTML='<div class="recall"><span class="rlab">Last cleared</span>'+
+      '<span class="chip">nothing yet</span></div>';
+    return;
+  }
+  var chips=S.last.vectors.map(function(v){
+    return '<span class="chip"><b>'+ARROW[v.dir]+" "+v.dir+'</b> '+v.speed+' mm/yr</span>';
+  }).join("");
+  var extra=S.last.guesses-S.last.min;
+  var tail = extra===0 ? '<span class="rgood">clean</span>'
+           : '<span class="rmiss">+'+extra+' guess'+(extra===1?'':'es')+'</span>';
+  if(S.last.locked===true) tail += '<span class="rgood">\u2713 locked in</span>';
+  if(S.last.locked===false) tail += '<span class="rmiss">comes back later</span>';
+  n.innerHTML='<div class="recall"><span class="rlab">Last cleared</span>'+
+    '<span class="rname">'+S.last.name+'</span>'+chips+tail+'</div>';
+}
+
+function say(msg,kind){
+  var n=document.getElementById("status");
+  if(n){ n.textContent=msg||""; n.className="status "+(kind||"dim"); }
+}
+function hud(){
+  var n=document.getElementById("hud");
+  if(!n) return;
+  var g=S.totalGuesses+S.roundGuesses;
+  if(S.run==="goal"){
+    n.innerHTML = "Locked "+S.done.length+" / "+PLATES.length+"<br>"+g+" guesses &middot; min "+MIN_GUESSES;
+  } else {
+    n.innerHTML = "Practice<br>"+S.practiceDone+" cleared";
+  }
+}
+function panel(){
+  var p=document.getElementById("panel");
+  if(!p) return;
+  if(S.stage==="identify"){
+    if(S.mode==="name"){
+      p.innerHTML='<div class="answer">'+
+        '<input type="text" id="nm" placeholder="Name the amber plate\u2026" autocomplete="off" '+
+        'autocapitalize="off" autocorrect="off" spellcheck="false">'+
+        '<button class="btn primary" id="ck">Check</button></div>';
+      var inp=document.getElementById("nm");
+      document.getElementById("ck").addEventListener("click", submitName);
+      inp.addEventListener("keydown", function(e){ if(e.key==="Enter") submitName(); });
+      inp.focus();
+    } else {
+      p.innerHTML='';
+    }
+    return;
+  }
+  var n=S.plate.vectors.length, doneN=S.solved.filter(Boolean).length;
+  var rows=ROSE.map(function(row){
+    return row.map(function(d){
+      if(!d) return '<div class="mid">tap a<br>square<br>first</div>';
+      return '<button data-dir="'+d+'" aria-label="'+d+'">'+ARROW[d]+'</button>';
+    }).join("");
+  }).join("");
+  p.innerHTML='<div class="dial">'+
+    '<div class="dial-head"><span class="tag">Direction of motion</span>'+
+    '<span class="tag">'+doneN+' / '+n+' set</span></div>'+
+    '<div class="rose" id="rose">'+rows+'</div></div>';
+  Array.prototype.forEach.call(document.querySelectorAll("#rose button"), function(b){
+    b.addEventListener("click", function(){ pressDir(b.getAttribute("data-dir")); });
+  });
+  var mid=document.querySelector("#rose .mid");
+  if(mid){
+    mid.innerHTML = n>1 ? ("arrow<br>"+(S.sel+1)+" of "+n) : "set the<br>arrow";
+  }
+}
+
+/* ---------- judging ---------- */
+function judgeIdentify(ok, tappedId){
+  S.roundGuesses++;
+  if(ok){
+    if(S.mode==="find"){ blink(S.plate.id,"hit"); light(S.plate.id,"lit"); }
+    S.stage="motion";
+    S.sel=firstUnsolved();
+    drawMarks(); panel();
+    say(S.plate.name+" \u2014 now tap a square, then a compass direction.","ok");
+  } else {
+    if(S.mode==="find" && tappedId) blink(tappedId,"miss");
+    say(S.mode==="find" ? "Not that one." : "Not quite \u2014 try again.","bad");
+  }
+  hud();
+}
+function submitName(){
+  var inp=document.getElementById("nm");
+  if(!inp || !inp.value.trim()) return;
+  var ok=matches(inp.value, S.plate);
+  if(ok) inp.blur(); else inp.select();
+  judgeIdentify(ok, null);
+}
+function pressDir(dir){
+  if(S.stage!=="motion") return;
+  var i=S.sel;
+  if(i<0 || S.solved[i]) i=firstUnsolved();
+  if(i<0) return;
+  S.sel=i;
+  S.roundGuesses++;
+  var v=S.plate.vectors[i];
+  if(v.dir===dir){
+    S.solved[i]=true;
+    var nxt=firstUnsolved();
+    S.sel = nxt<0 ? i : nxt;
+    drawMarks();
+    if(nxt<0){ hud(); clearRound(); return; }
+    panel();
+    say("Correct \u2014 " + v.speed + " mm/yr " + v.dir + ". " +
+        (S.plate.vectors.length-S.solved.filter(Boolean).length) + " to go.","ok");
+  } else {
+    var box=gMark.querySelector('[data-vec="'+i+'"] .mk-box');
+    if(box){ box.classList.add("bad"); setTimeout(function(){ box.classList.remove("bad"); },380); }
+    say("Not " + dir + " there. Try again.","bad");
+  }
+  hud();
+}
+
+function clearRound(){
+  var perfect = S.roundGuesses === 1 + S.plate.vectors.length;
+  var locking = S.run==="goal" ? perfect : null;
+
+  // The answer moves into its own slot and stays there through the next
+  // prompt, so it can actually be read instead of flashing past.
+  S.last={
+    name:S.plate.name,
+    vectors:S.plate.vectors.map(function(v){ return {dir:v.dir, speed:v.speed}; }),
+    guesses:S.roundGuesses,
+    min:1+S.plate.vectors.length,
+    locked:locking
+  };
+
+  if(S.run==="goal"){
+    S.totalGuesses += S.roundGuesses;      // every guess counts toward the score
+    if(perfect){
+      // location and every direction right first time: this one is done
+      S.done.push(S.plate.id);
+      S.queue.shift();
+      unlight(S.plate.id,"lit");
+      light(S.plate.id,"locked");
+    } else {
+      // any stumble and it goes to the back of the queue to be earned again
+      S.queue.push(S.queue.shift());
+    }
+    saveProgress(S.mode,{done:S.done,guesses:S.totalGuesses});
+  } else {
+    S.queue.shift();
+    S.practiceDone++;
+  }
+  S.stage="cleared";
+  hud(); recall();
+  setTimeout(round, 420);
+}
+
+/* ---------- finish ---------- */
+function finish(){
+  var g=S.totalGuesses, extra=g-MIN_GUESSES;
+  var acc=Math.round(MIN_GUESSES/g*100);
+  app.innerHTML=
+  '<div class="eyebrow">'+(S.mode==="find"?"Find":"Name")+' \u00b7 goal complete</div>'+
+  '<h1>All '+PLATES.length+' plates cleared</h1>'+
+  '<div class="card"><div class="figures">'+
+    '<div><div class="fig">'+g+'</div><div class="figlab">your guesses</div></div>'+
+    '<div><div class="fig">'+MIN_GUESSES+'</div><div class="figlab">minimum</div></div>'+
+    '<div><div class="fig">'+acc+'%</div><div class="figlab">efficiency</div></div>'+
+  '</div>'+
+  '<p style="margin:0">'+(extra===0
+      ? "A flawless run \u2014 every plate and every arrow on the first try."
+      : extra+" guess"+(extra===1?"":"es")+" beyond the minimum of "+MIN_GUESSES+
+        " ("+PLATES.length+" identifications + "+TOTAL_VEC+" arrows).")+'</p></div>'+
+  '<div class="pair">'+
+    '<button class="btn primary" id="again">Run it again</button>'+
+    '<button class="btn" id="home">Menu</button>'+
+  '</div>';
+  document.getElementById("again").addEventListener("click", function(){
+    wipeProgress(S.mode).then(function(){
+      S.done=[]; S.totalGuesses=0; S.pickMode=S.mode; S.pickRun="goal"; start();
+    });
+  });
+  document.getElementById("home").addEventListener("click", menu);
+}
+
+/* ---------- self-test ---------- */
+window.__selftest=function(){
+  var fails=[];
+  function ok(c,m){ if(!c) fails.push(m); }
+  ok(PLATES.length===20,"plate count "+PLATES.length);
+  ok(MIN_GUESSES===PLATES.length+TOTAL_VEC,"min guesses arithmetic");
+  PLATES.forEach(function(p){
+    ok(p.rings.length>0,"rings "+p.id);
+    ok(p.vectors.length>=1&&p.vectors.length<=3,"vector count "+p.id);
+    p.rings.forEach(function(r){ ok(r.length>=4,"ring size "+p.id); });
+    p.vectors.forEach(function(v){
+      ok(!!ARROW[v.dir],"dir "+p.id+" "+v.dir);
+      ok(v.lon>=-180&&v.lon<=180&&v.lat>=-90&&v.lat<=90,"coords "+p.id);
+      var inside=p.rings.some(function(r){
+        var ins=false;
+        for(var i=0,j=r.length-1;i<r.length;j=i++){
+          var xi=r[i][0],yi=r[i][1],xj=r[j][0],yj=r[j][1];
+          if((yi>v.lat)!==(yj>v.lat) && v.lon<(xj-xi)*(v.lat-yi)/(yj-yi)+xi) ins=!ins;
+        }
+        return ins;
+      });
+      ok(inside,"marker inside polygon "+p.id);
+    });
+    ok(matches(p.name,p),"self name match "+p.id);
+    ok(matches(p.name.replace(" Plate",""),p),"bare name match "+p.id);
+  });
+  // no name or alias may be accepted for any other plate
+  PLATES.forEach(function(a){
+    var tries=[a.name].concat(a.aliases);
+    PLATES.forEach(function(b){
+      if(a.id===b.id) return;
+      tries.forEach(function(t){
+        ok(!matches(t,b), "'"+t+"' wrongly accepted as "+b.name);
+      });
+    });
+  });
+  ok(matches("pacific",PLATES.filter(function(p){return p.id==="pa";})[0]),"pacific");
+  ok(matches("eurasian",PLATES.filter(function(p){return p.id==="eu";})[0]),"eurasian");
+  ok(matches("juan de fuca",PLATES.filter(function(p){return p.id==="jf";})[0]),"jdf");
+  ok(matches("nazca",PLATES.filter(function(p){return p.id==="nz";})[0]),"nazca");
+  ok(matches("phillipine sea",PLATES.filter(function(p){return p.id==="ps";})[0]),"ps typo tolerated");
+  ok(matches("antartic",PLATES.filter(function(p){return p.id==="an";})[0]),"antarctic typo tolerated");
+  ok(!matches("south american",PLATES.filter(function(p){return p.id==="na";})[0]),"sa!=na");
+  ok(!matches("north american",PLATES.filter(function(p){return p.id==="sa";})[0]),"na!=sa");
+  return fails;
+};
+
+applyTheme();
+loadTheme().then(menu);
+})();
+</script>
+</body>
+</html>

@@ -5,6 +5,8 @@ Memorize anything.
 Adventures in self-quizzing to learn fast. Interactions are simple: prompt, tap, repeat. 
 Idempotent mode makes correct answers sticky; keep guessing until you get 'em all.
 
+![image](quiz-example.png)
+
 ## Run it
 
 ```sh

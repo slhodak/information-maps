@@ -7,7 +7,18 @@ Idempotent mode makes correct answers sticky; keep guessing until you get 'em al
 
 Subjects include Earth Sciences, Geography, Machine Learning, and Music.
 
-![image](quiz-example.png)
+In geography, a correct answer is clear by its position:
+
+![geo-image](example_images/geo-quiz-example.png)
+
+The same principle can be applied to math,
+
+![math-image](example_images/math-quiz-example.png)
+
+And through code it can be applied to processes too:
+
+![code-image](example_images/code-quiz-example.png)
+
 
 ## Run it
 

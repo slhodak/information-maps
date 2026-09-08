@@ -1,4 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+  mercY,
+  mercLat,
+  haversine,
+  segDist,
+  shuffle,
+} from "../../../map/projection";
+import { makeMatcher } from "../../../engine/match";
+import { useReportResult } from "../../../app/result-context";
+
+/* Answer matching, projection and geometry helpers now come from the shared
+   engine/map kits (identical behaviour — same accent-folding, same stop
+   words, same typo tolerance). Score + completion are reported to the app
+   shell so the catalog can show progress. */
+const matchName = makeMatcher({ stopWords: ["the", "current", "ocean", "sea"] });
+const matches = (typed, c) => matchName(typed, c.a);
 
 /* ============================================================================
    Atlas Drill — Ocean Currents
@@ -300,9 +316,7 @@ const FAM_NOTE = {
 };
 
 /* --------------------------------------------------------------- projection */
-const DEG = 180 / Math.PI;
-const mercY = (lat) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)) * DEG;
-const mercLat = (y) => (360 / Math.PI) * Math.atan(Math.exp(y / DEG)) - 90;
+/* mercY / mercLat imported from ../../../map/projection */
 const TOPY = mercY(80), BOTY = mercY(-78);
 const MAP_W = 360, MAP_H = TOPY - BOTY;
 /* world space: wx = lon + 180 (0..360), wy = TOPY - mercY(lat) (0..MAP_H) */
@@ -355,43 +369,8 @@ const TOTAL = CUR.length;
 const FAM_COUNT = {};
 CUR.forEach((c) => { FAM_COUNT[c.f] = (FAM_COUNT[c.f] || 0) + 1; });
 
-/* ------------------------------------------------------------- answer match */
-const norm = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-  .replace(/[^a-z0-9]+/g, " ").replace(/\b(the|current|ocean|sea)\b/g, " ").replace(/\s+/g, " ").trim();
-const lev = (a, b) => {
-  if (Math.abs(a.length - b.length) > 2) return 9;
-  const m = a.length, n = b.length;
-  let prev = new Array(n + 1); for (let j = 0; j <= n; j++) prev[j] = j;
-  for (let i = 1; i <= m; i++) {
-    const cur = [i];
-    for (let j = 1; j <= n; j++)
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    prev = cur;
-  }
-  return prev[n];
-};
-/* accepts the current's own aliases, forgiving a typo or two on longer words */
-const matches = (typed, c) => {
-  const t = norm(typed);
-  if (!t) return false;
-  for (const a of c.a) {
-    const k = norm(a);
-    if (!k) continue;
-    if (t === k) return true;
-    if (k.length >= 6 && lev(t, k) <= (k.length >= 12 ? 3 : 2)) return true;
-  }
-  return false;
-};
-
 /* ------------------------------------------------------------------ geometry */
-function segDist(px, py, ax, ay, bx, by) {
-  const dx = bx - ax, dy = by - ay;
-  const d2 = dx * dx + dy * dy;
-  let t = d2 ? ((px - ax) * dx + (py - ay) * dy) / d2 : 0;
-  t = t < 0 ? 0 : t > 1 ? 1 : t;
-  const qx = ax + t * dx, qy = ay + t * dy;
-  return { d: Math.hypot(px - qx, py - qy), x: qx, y: qy };
-}
+/* segDist imported from ../../../map/projection */
 /* nearest approach of a world-space point to a path, wrapping longitude */
 function nearestOn(path, wx, wy) {
   let best = { d: Infinity, x: 0, y: 0 };
@@ -405,13 +384,7 @@ function nearestOn(path, wx, wy) {
   }
   return best;
 }
-const R_EARTH = 6371;
-const haversine = (lo1, la1, lo2, la2) => {
-  const p = Math.PI / 180;
-  const a = 0.5 - Math.cos((la2 - la1) * p) / 2
-    + Math.cos(la1 * p) * Math.cos(la2 * p) * (1 - Math.cos((lo2 - lo1) * p)) / 2;
-  return 2 * R_EARTH * Math.asin(Math.sqrt(a));
-};
+/* haversine imported from ../../../map/projection */
 
 /* ------------------------------------------------------------------- drawing */
 /* Catmull-Rom through the waypoints, so a current reads as a flowing line
@@ -765,7 +738,7 @@ const LEGS = [
   ["Rockall Trough", 0.34], ["Canary upwelling", 0.46], ["Cape Agulhas", 0.58],
   ["The Roaring Forties", 0.72], ["Drake Passage", 0.86], ["The Sargasso", 0.95], ["Home water", 1],
 ];
-const shuffle = (a) => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0;[b[i], b[j]] = [b[j], b[i]]; } return b; };
+/* shuffle imported from ../../../map/projection */
 const allIds = CUR.map((_, i) => i);
 const fmt = (n) => n.toLocaleString("en-US");
 const knots = (cms) => (cms * 0.0194384).toFixed(1);
@@ -924,6 +897,12 @@ export default function AtlasDrillCurrents() {
   const target = queue.length ? queue[0] : null;
   const tc = target != null ? CUR[target] : null;
   const done = session === "drift" && solved.size === TOTAL;
+
+  /* report progress to the app shell (persisted for the catalog) */
+  const report = useReportResult();
+  useEffect(() => {
+    if (score.total > 0 || done) report({ score, completed: done });
+  }, [score, done, report]);
 
   const clear = () => { setPhase("ask"); setFlash(null); setMark(null); setNote(null); setNudge(""); setTyped(""); };
 

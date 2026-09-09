@@ -421,7 +421,8 @@ export default function ClefDrill() {
         <div
           style={{
             position: "fixed",
-            top: "20px",
+            // clear the platform's sticky "← All drills" bar (~41px tall)
+            top: "56px",
             left: "20px",
             right: "20px",
             display: "flex",

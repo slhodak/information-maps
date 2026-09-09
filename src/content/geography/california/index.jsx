@@ -646,7 +646,9 @@ function Quiz({ input, session, borders, climb, setClimb }) {
 export default function AtlasDrillCalifornia() {
   const [input, setInput] = useState("type"); // type | tap
   const [session, setSession] = useState("practice"); // practice | climb
-  const [borders, setBorders] = useState(false);
+  // County lines on by default: the outline is the thing you're naming, and
+  // in tap mode it's what you're aiming at.
+  const [borders, setBorders] = useState(true);
   const [climb, setClimb] = useState(() => ({
     solved: new Set(),
     queue: shuffle(ALL_IDS),

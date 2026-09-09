@@ -93,6 +93,36 @@ const CITIES_RAW = [
   { n: "Harare", country: "Zimbabwe", lat: -17.8252, lon: 31.0335, role: "Capital", b: "Highveld capital, laid out by the Pioneer Column in 1890 as Salisbury.", pop: "~1.6M", admin: true, econ: true },
 ];
 
+// ---------- the other drill set: the countries themselves ----------
+//
+// The 54 UN member states, straight off the same outlines the border overlay
+// draws — no separate list to keep in sync. The cities above already name
+// their country, so each country's capitals come from that data rather than
+// being written down twice; COUNTRY_JOIN covers the two places where the two
+// datasets spell a country differently.
+const COUNTRY_JOIN = {
+  "DR Congo": "Democratic Republic of the Congo",
+  "The Gambia": "Gambia",
+};
+
+// Extra accepted spellings, keyed by ISO3.
+const COUNTRY_ALIASES = {
+  COD: ["democratic republic of the congo", "dr congo", "drc", "congo kinshasa", "zaire"],
+  COG: ["republic of the congo", "congo brazzaville", "congo"],
+  CIV: ["ivory coast", "cote d ivoire", "cote divoire"],
+  SWZ: ["eswatini", "swaziland"],
+  CPV: ["cape verde", "cabo verde"],
+  GMB: ["gambia", "the gambia"],
+  STP: ["sao tome and principe", "sao tome", "sao tome principe"],
+  TZA: ["tanzania", "united republic of tanzania"],
+  CAF: ["central african republic", "car"],
+  GNQ: ["equatorial guinea"],
+  SDS: ["south sudan"],
+  ZAF: ["south africa"],
+  MRT: ["mauritania"],
+  MUS: ["mauritius"],
+};
+
 // Extra accepted spellings, keyed by city name.
 const ALIASES = {
   "Yaoundé": ["yaounde"],
@@ -218,6 +248,61 @@ const COUNTRY_PATHS = COUNTRIES_RAW.map((c) => polysToPath(c.geometry.coordinate
 const FILLER_PATH = FILLER.map(ringToPath).join("");
 const BORDER_PATH = COUNTRY_PATHS.join("") + FILLER_PATH;
 
+// Looked up by id when the countries game needs to fill in one shape — the
+// target, or whichever wrong country got tapped.
+const COUNTRY_PATH_BY_ID = Object.fromEntries(
+  COUNTRIES_RAW.map((c, i) => [c.id, COUNTRY_PATHS[i]])
+);
+
+// Point-in-polygon in lon/lat space. Even-odd across every ring of a polygon,
+// so interior rings (Lesotho inside South Africa) are treated as holes.
+function containsLonLat(polys, lon, lat) {
+  for (const poly of polys) {
+    let inside = false;
+    for (const ring of poly) {
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const xi = ring[i][0], yi = ring[i][1];
+        const xj = ring[j][0], yj = ring[j][1];
+        if (yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) {
+          inside = !inside;
+        }
+      }
+    }
+    if (inside) return true;
+  }
+  return false;
+}
+
+// Area-weighted centroid of the largest piece, used to mark a country and to
+// anchor the locator ring on the ones too small to see.
+function markerPoint(polys) {
+  let best = null, bestArea = -1;
+  for (const poly of polys) {
+    const r = poly[0];
+    let a = 0;
+    for (let i = 0; i < r.length - 1; i++) a += r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1];
+    a = Math.abs(a) / 2;
+    if (a > bestArea) { bestArea = a; best = r; }
+  }
+  let cx = 0, cy = 0, n = 0;
+  for (const [x, y] of best) { cx += x; cy += y; n++; }
+  const lon = cx / n, lat = cy / n;
+  if (containsLonLat(polys, lon, lat)) return project(lon, lat);
+  // Concave shape: fall back to a scan for a point that's actually inside.
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of best) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  for (let i = 1; i < 12; i++) {
+    for (let j = 1; j < 12; j++) {
+      const tx = x0 + ((x1 - x0) * i) / 12, ty = y0 + ((y1 - y0) * j) / 12;
+      if (containsLonLat(polys, tx, ty)) return project(tx, ty);
+    }
+  }
+  return project(lon, lat);
+}
+
 function kmBetween(lon1, lat1, lon2, lat2) {
   const R = 6371, t = Math.PI / 180;
   const dLat = (lat2 - lat1) * t, dLon = (lon2 - lon1) * t;
@@ -238,6 +323,84 @@ const CITIES = CITIES_RAW.map((c) => {
     accepted: [normalize(c.n), ...extra.map(normalize)],
   };
 });
+
+// The country pool. `x`/`y` mark it on the map, `polys` answer a tap, and the
+// meta line is assembled from the city list so the two halves of the drill
+// stay consistent by construction: name the seat of government, and the
+// commercial centre after it wherever that's a different city.
+// "Economic capital · largest city" -> "economic capital". Each city's role is
+// already written precisely, so the hint quotes it rather than assuming what
+// a country's second city is for — Cotonou and Abidjan are seats of
+// government, not commercial rivals to the official capital.
+function roleWord(role) {
+  return role.split("·")[0].trim().toLowerCase();
+}
+
+const COUNTRY_POOL = COUNTRIES_RAW.map((c) => {
+  const [x, y] = markerPoint(c.geometry.coordinates);
+  const extra = COUNTRY_ALIASES[c.id] || [];
+  const mine = CITIES_RAW.filter((k) => (COUNTRY_JOIN[k.country] || k.country) === c.name);
+  // A seat is the city the drill calls administrative, plus any other branch
+  // of government with a capital of its own — South Africa keeps its
+  // executive, legislative and judicial seats in three different cities.
+  const isSeat = (k) =>
+    k.admin || (/capital/i.test(k.role) && !/economic|commercial/i.test(k.role));
+  const seats = mine.filter(isSeat).map((k) => k.n);
+  const hub = mine.find((k) => !isSeat(k) && k.econ) || mine.find((k) => !isSeat(k));
+  return {
+    id: c.id,
+    n: c.name,
+    polys: c.geometry.coordinates,
+    x,
+    y,
+    seats,
+    hub: hub ? { n: hub.n, role: roleWord(hub.role) } : null,
+    accepted: [normalize(c.name), ...extra.map(normalize)],
+  };
+});
+
+// Countries that occupy only a few pixels at default zoom need a locator
+// ring, or the highlight is invisible. Islands, mostly.
+const TINY = new Set(
+  COUNTRY_POOL.filter((c) => {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const poly of c.polys)
+      for (const ring of poly)
+        for (const [lon, lat] of ring) {
+          const [x, y] = project(lon, lat);
+          if (x < x0) x0 = x; if (x > x1) x1 = x;
+          if (y < y0) y0 = y; if (y > y1) y1 = y;
+        }
+    return Math.max(x1 - x0, y1 - y0) < 26;
+  }).map((c) => c.id)
+);
+
+// Projected vertices of each tiny country, so a tap landing in open water just
+// beside an island can still be credited to it.
+const TINY_PTS = Object.fromEntries(
+  [...TINY].map((id) => {
+    const c = COUNTRY_POOL.find((x) => x.id === id);
+    const pts = [];
+    for (const poly of c.polys)
+      for (const ring of poly) for (const [lon, lat] of ring) pts.push(project(lon, lat));
+    return [id, pts];
+  })
+);
+
+function distToTiny(id, x, y) {
+  let best = Infinity;
+  for (const [px, py] of TINY_PTS[id]) {
+    const d = (px - x) ** 2 + (py - y) ** 2;
+    if (d < best) best = d;
+  }
+  return Math.sqrt(best);
+}
+
+// Tap tolerance in map units at 1x, divided by the zoom level so it stays a
+// constant distance under the fingertip instead of growing on zoom-in. The
+// nearest two ocean islands are ~120 units apart, so this can't make one
+// island's slop reach another.
+const TAP_SLOP = 36;
 
 // Three ways to narrow the field. "All" is every seat and every commercial
 // centre. "Administrative" is one city per country — the seat of government,
@@ -333,15 +496,24 @@ function shuffled(arr) {
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-export default function AfricaCityQuiz() {
+export default function AfricaAtlasDrill() {
+  const [domain, setDomain] = useState("countries");
   const [input, setInput] = useState("type");
   const [session, setSession] = useState("practice");
   const [scope, setScope] = useState("all");
-  // Borders are on by default here: a city drill without them is guesswork,
-  // since half of what you're recalling is which country the dot sits in.
+  // Political borders on by default in both games — the country outlines are
+  // the reference you're checking a city against, and in the countries game
+  // the point is to attach a name to a shape you can already see, not to
+  // guess a shape that isn't drawn.
   const [borders, setBorders] = useState(true);
   const [hints, setHints] = useState(false);
-  const pool = POOLS[scope];
+  const cities = domain === "cities";
+  const pool = cities ? POOLS[scope] : COUNTRY_POOL;
+
+  const pickDomain = (d) => {
+    if (d === domain) return;
+    setDomain(d);
+  };
 
   return (
     <div className="acq-page" style={S.page}>
@@ -395,8 +567,23 @@ export default function AfricaCityQuiz() {
 
       <div style={S.header}>
         <div style={S.eyebrow}>ATLAS DRILL</div>
-        <h1 style={S.title}>African Cities · {pool.length}</h1>
-        <div style={S.sub}>{SCOPE_BLURB[scope]}</div>
+        <h1 style={S.title}>
+          African {cities ? "Cities" : "Countries"} · {pool.length}
+        </h1>
+        <div style={S.sub}>
+          {cities
+            ? SCOPE_BLURB[scope]
+            : "every UN member state — one shape each, no capitals involved"}
+        </div>
+      </div>
+
+      <div style={S.modeRow}>
+        <ModeButton
+          label="Countries"
+          active={!cities}
+          onClick={() => pickDomain("countries")}
+        />
+        <ModeButton label="Cities" active={cities} onClick={() => pickDomain("cities")} />
       </div>
 
       <div style={S.modeRow}>
@@ -405,22 +592,31 @@ export default function AfricaCityQuiz() {
       </div>
 
       <div className="acq-panel" style={S.panel}>
-        <div style={S.segRow}>
-          {Object.entries(SCOPES).map(([k, s]) => (
-            <SegButton key={k} label={s.label} active={scope === k} onClick={() => setScope(k)} />
-          ))}
-        </div>
+        {/* Scope narrows the city list by what a city IS. A country is just a
+            country, so the countries game has nothing to narrow. */}
+        {cities && (
+          <div style={S.segRow}>
+            {Object.entries(SCOPES).map(([k, s]) => (
+              <SegButton key={k} label={s.label} active={scope === k} onClick={() => setScope(k)} />
+            ))}
+          </div>
+        )}
 
         <div style={S.segRow}>
           <SegButton label="Practice" active={session === "practice"} onClick={() => setSession("practice")} />
-          <SegButton label="Cape to Cairo" active={session === "journey"} onClick={() => setSession("journey")} />
+          <SegButton
+            label={JOURNEY[domain].label}
+            active={session === "journey"}
+            onClick={() => setSession("journey")}
+          />
         </div>
 
         <Quiz
-          key={session + scope}
+          key={domain + session + scope}
+          domain={domain}
           pool={pool}
-          crowded={CROWDED[scope]}
-          tolerances={TOLERANCES[scope]}
+          crowded={cities ? CROWDED[scope] : null}
+          tolerances={cities ? TOLERANCES[scope] : null}
           input={input}
           session={session}
           borders={borders}
@@ -723,7 +919,83 @@ function resolveTap(pool, tol, lon, lat, target, at) {
   return { correct: city === target && km <= tol, km };
 }
 
-// ---------- the journey ----------
+// A tap in the countries game is right if it lands inside the target's own
+// outline — a shape, not a point, so the nearest-dot rule above doesn't apply.
+// The target wins any tie, since simplified borders overlap slightly along
+// shared edges.
+//
+// If the tap lands in open water, allow a near miss on a tiny country: at a
+// few pixels across, islands are smaller than a fingertip. Tolerance is only
+// ever applied over water, so it can never take a tap away from a country the
+// finger actually landed on. `at` is the tap in map coordinates and `k` the
+// current zoom.
+function resolveCountryTap(lon, lat, target, at, k = 1) {
+  if (target && containsLonLat(target.polys, lon, lat)) {
+    return { correct: true, guessId: target.id, guessName: target.n };
+  }
+
+  const hit = COUNTRY_POOL.find((c) => containsLonLat(c.polys, lon, lat));
+  if (hit) return { correct: false, guessId: hit.id, guessName: hit.n };
+
+  if (at) {
+    const slop = TAP_SLOP / k;
+    // The target gets first claim on a near miss.
+    if (target && TINY.has(target.id) && distToTiny(target.id, at.x, at.y) <= slop) {
+      return { correct: true, guessId: target.id, guessName: target.n };
+    }
+    let best = null, bestD = Infinity;
+    for (const id of TINY) {
+      const d = distToTiny(id, at.x, at.y);
+      if (d <= slop && d < bestD) { bestD = d; best = id; }
+    }
+    if (best) {
+      const c = COUNTRY_POOL.find((x) => x.id === best);
+      return { correct: false, guessId: best, guessName: c.n };
+    }
+  }
+  return { correct: false, guessId: null, guessName: "open water" };
+}
+
+// One answered country, filled and outlined in its verdict colour. The tiny
+// ones get a ring as well: Comoros or Seychelles shaded green is a couple of
+// invisible pixels at default zoom, so without the ring the answer may as
+// well not be drawn at all.
+function CountryHighlight({ id, color, k }) {
+  const d = COUNTRY_PATH_BY_ID[id];
+  if (!d) return null;
+  const item = COUNTRY_POOL.find((c) => c.id === id);
+  return (
+    <g>
+      <path
+        d={d}
+        fillRule="evenodd"
+        fill={color}
+        fillOpacity={0.45}
+        stroke={color}
+        strokeWidth={2.2 / k}
+        strokeLinejoin="round"
+        opacity={0.9}
+      />
+      {TINY.has(id) && item && (
+        <circle
+          cx={item.x}
+          cy={item.y}
+          r={15 / k}
+          fill="none"
+          stroke={color}
+          strokeWidth={2 / k}
+          opacity={0.95}
+        />
+      )}
+    </g>
+  );
+}
+
+// ---------- the journeys ----------
+//
+// One per game, because the natural shape of each is different: the cities
+// run south to north as a road trip, the countries stack up as a climb. Both
+// are just a fraction of the pool answered, dressed differently.
 //
 // Cape to Cairo, roughly the old rail-and-road dream, about 10,500 km.
 const TOTAL_KM = 10500;
@@ -748,11 +1020,42 @@ function legFor(frac) {
   return l.name;
 }
 
-// ---------- one quiz, two ways to answer, two ways to play ----------
+// Kilimanjaro, for the countries: Uhuru Peak at 5,895 m, by the Machame route.
+const SUMMIT_M = 5895;
 
-function Quiz({ pool, crowded, tolerances, input, session, borders, hints }) {
+const CAMPS = [
+  { at: 0.0, name: "Machame Gate" },
+  { at: 0.2, name: "Machame Camp" },
+  { at: 0.4, name: "Shira Camp" },
+  { at: 0.6, name: "Barranco Wall" },
+  { at: 0.78, name: "Karanga Camp" },
+  { at: 0.92, name: "Barafu Camp" },
+  { at: 1.0, name: "Uhuru Peak" },
+];
+
+function campFor(frac) {
+  let c = CAMPS[0];
+  for (const camp of CAMPS) if (frac >= camp.at) c = camp;
+  return c.name;
+}
+
+// What each game calls its journey, and where it ends.
+const JOURNEY = {
+  cities: { label: "Cape to Cairo", end: "Cairo" },
+  countries: { label: "Kilimanjaro", end: "Uhuru Peak" },
+};
+
+// ---------- one quiz, two things to learn, two ways to answer each ----------
+//
+// `domain` is what's being drilled: the countries as shapes, or the cities as
+// points. `input` is how you answer: "type" the marked one, or "tap" the named
+// one. `session` is how it's scored: "practice" runs forever with a running
+// tally, "journey" is the run that ends — Cape to Cairo, or Kilimanjaro.
+
+function Quiz({ domain, pool, crowded, tolerances, input, session, borders, hints }) {
   const journey = session === "journey";
   const typing = input === "type";
+  const cities = domain === "cities";
 
   const [queue, setQueue] = useState(() => shuffled(pool.map((c) => c.id)));
   const [solved, setSolved] = useState(() => new Set());
@@ -795,24 +1098,33 @@ function Quiz({ pool, crowded, tolerances, input, session, borders, hints }) {
       answerSeq.current += 1;
       setLastAnswer({
         key: answerSeq.current,
+        id: target.id,
         n: target.n,
         country: target.country,
         role: target.role,
         b: target.b,
         pop: target.pop,
+        seats: target.seats,
+        hub: target.hub,
         tx: target.x,
         ty: target.y,
         correct,
+        domain,
         ...extra,
       });
       advanceQueue(correct);
     },
-    [target, journey, advanceQueue]
+    [target, journey, advanceQueue, domain]
   );
 
   const onTap = useCallback(
-    (lon, lat, at) => {
+    (lon, lat, at, k) => {
       if (typing || !target) return;
+      if (!cities) {
+        const r = resolveCountryTap(lon, lat, target, at, k);
+        recordAnswer(r.correct, { atX: at.x, atY: at.y, guessId: r.guessId, guessName: r.guessName });
+        return;
+      }
       const r = resolveTap(pool, tolerances[target.id], lon, lat, target, at);
       recordAnswer(r.correct, { atX: at.x, atY: at.y, km: r.km });
     },
@@ -839,9 +1151,21 @@ function Quiz({ pool, crowded, tolerances, input, session, borders, hints }) {
   const frac = count / pool.length;
   const TARGET_FILL = "#f3e9d8";
 
+  const noun = cities ? "city" : "country";
+
   let prompt;
-  if (arrived) prompt = <span style={{ color: "#e3a542", fontWeight: 700 }}>Cairo. All {pool.length}.</span>;
-  else if (typing) prompt = <span style={{ color: "#8b93a7" }}>Name the marked city</span>;
+  if (arrived)
+    prompt = (
+      <span style={{ color: "#e3a542", fontWeight: 700 }}>
+        {JOURNEY[domain].end}. All {pool.length}.
+      </span>
+    );
+  else if (typing)
+    prompt = (
+      <span style={{ color: "#8b93a7" }}>
+        {cities ? "Name the marked city" : "Name the country in cream"}
+      </span>
+    );
   else
     prompt = (
       <>
@@ -853,16 +1177,45 @@ function Quiz({ pool, crowded, tolerances, input, session, borders, hints }) {
 
   return (
     <div className="acq-layout">
-      <TapMap gestures={gestures} label={arrived ? "Map of Africa, every city found." : "Map of Africa."}>
+      <TapMap
+        gestures={gestures}
+        label={arrived ? `Map of Africa, every ${noun} found.` : "Map of Africa."}
+      >
         {(k) => (
           <>
             <BaseMap dim="#39445a" k={k} />
 
-            {/* Cities already reached stay on the map for the rest of the run. */}
+            {/* Places already reached stay on the map for the rest of the run
+                — as filled shapes in the countries game, as dots in the cities
+                one, matching how each is marked when you answer it. */}
             {journey &&
               [...solved].map((id) => {
                 const c = pool.find((x) => x.id === id);
                 if (!c || (target && c.id === target.id)) return null;
+                if (!cities) {
+                  return (
+                    COUNTRY_PATH_BY_ID[c.id] && (
+                      <g key={id} opacity={0.9}>
+                        <path
+                          d={COUNTRY_PATH_BY_ID[c.id]}
+                          fillRule="evenodd"
+                          fill="#e3a542"
+                          fillOpacity={0.85}
+                        />
+                        {TINY.has(c.id) && (
+                          <circle
+                            cx={c.x}
+                            cy={c.y}
+                            r={14 / k}
+                            fill="none"
+                            stroke="#e3a542"
+                            strokeWidth={2 / k}
+                          />
+                        )}
+                      </g>
+                    )
+                  );
+                }
                 return (
                   <g key={id}>
                     <circle cx={c.x} cy={c.y} r={3.4 / k} fill="#e3a542" />
@@ -882,11 +1235,29 @@ function Quiz({ pool, crowded, tolerances, input, session, borders, hints }) {
                 );
               })}
 
-            {/* The just-answered city and the line to where you guessed stay
+            {/* The just-answered place and the line to where you guessed stay
                 put until the next answer replaces them — same lifetime as the
                 card in the side panel, so the map and the text never disagree
-                about which guess they're describing. */}
-            {lastAnswer && (
+                about which guess they're describing.
+
+                Country guesses highlight the actual shape instead of a point:
+                there's no single "correct spot" inside a country the way there
+                is for a city, so a dot only ever points at an arbitrary place
+                rather than the answer. Get it wrong and two shapes light up:
+                the one you picked in red, the one you were after in green, so
+                the miss is legible as a pair. */}
+            {lastAnswer && !cities && (
+              <g key={lastAnswer.key}>
+                {!lastAnswer.correct &&
+                  lastAnswer.guessId &&
+                  lastAnswer.guessId !== lastAnswer.id && (
+                    <CountryHighlight id={lastAnswer.guessId} color="#e2645a" k={k} />
+                  )}
+                <CountryHighlight id={lastAnswer.id} color="#5fbf7a" k={k} />
+              </g>
+            )}
+
+            {lastAnswer && cities && (
               <g key={lastAnswer.key} opacity={0.6}>
                 {lastAnswer.atX !== undefined && (
                   <line
@@ -922,8 +1293,32 @@ function Quiz({ pool, crowded, tolerances, input, session, borders, hints }) {
               </g>
             )}
 
-            {/* Name it: the dot is the question. */}
-            {typing && target && (
+            {/* Name it: the marked place is the question. A country is filled
+                in cream — never gold, so it can't be mistaken for one already
+                climbed — and a city is a pinging dot. */}
+            {typing && target && !cities && (
+              <g>
+                <path
+                  d={COUNTRY_PATH_BY_ID[target.id]}
+                  fillRule="evenodd"
+                  fill={TARGET_FILL}
+                  opacity={0.95}
+                />
+                {TINY.has(target.id) && (
+                  <circle
+                    className="acq-ping"
+                    cx={target.x}
+                    cy={target.y}
+                    r={14 / k}
+                    fill="none"
+                    stroke={TARGET_FILL}
+                    strokeWidth={2 / k}
+                  />
+                )}
+              </g>
+            )}
+
+            {typing && target && cities && (
               <g>
                 <circle
                   className="acq-ping"
@@ -946,23 +1341,31 @@ function Quiz({ pool, crowded, tolerances, input, session, borders, hints }) {
 
       <div className="acq-side">
         {journey ? (
-          <Progress count={count} total={pool.length} km={Math.round(frac * TOTAL_KM)} frac={frac} score={score} />
+          cities ? (
+            <Progress count={count} total={pool.length} km={Math.round(frac * TOTAL_KM)} frac={frac} score={score} />
+          ) : (
+            <Altimeter count={count} total={pool.length} metres={Math.round(frac * SUMMIT_M)} frac={frac} score={score} />
+          )
         ) : (
           <ScoreRow score={score} />
         )}
 
         <div style={S.prompt}>{prompt}</div>
         <div style={S.subPrompt}>
-          {arrived ? "\u00a0" : hints ? `${target.role} · ${target.country}` : "\u00a0"}
+          {arrived || !hints
+            ? "\u00a0"
+            : cities
+              ? `${target.role} · ${target.country}`
+              : capitalLine(target)}
         </div>
 
         {arrived ? (
           <div style={S.row}>
             <div style={{ ...S.feedback, flex: 1, color: "#e3a542" }}>
-              {score.total} guesses from the Cape.
+              {score.total} guesses {cities ? "from the Cape" : "to the summit"}.
             </div>
             <button className="acq-btn" style={S.primary} onClick={restart}>
-              Ride again
+              {cities ? "Ride again" : "Climb again"}
             </button>
           </div>
         ) : typing ? (
@@ -971,7 +1374,7 @@ function Quiz({ pool, crowded, tolerances, input, session, borders, hints }) {
               ref={inputRef}
               className="acq-input"
               type="text"
-              name="city-answer"
+              name="place-answer"
               autoComplete="off"
               data-1p-ignore
               data-lpignore="true"
@@ -981,7 +1384,7 @@ function Quiz({ pool, crowded, tolerances, input, session, borders, hints }) {
                 ...S.input,
                 borderColor: lastAnswer ? (lastAnswer.correct ? "#5fbf7a" : "#e2645a") : "#2a3241",
               }}
-              placeholder="Name the marked city"
+              placeholder={cities ? "Name the marked city" : "Name the country in cream"}
               value={typed}
               autoCapitalize="words"
               autoCorrect="off"
@@ -996,6 +1399,7 @@ function Quiz({ pool, crowded, tolerances, input, session, borders, hints }) {
           </div>
         ) : (
           target &&
+          cities &&
           crowded.has(target.id) && (
             <div style={{ ...S.hint, textAlign: "left" }}>
               Two drill cities sit close together here — zoom in before you commit.
@@ -1009,6 +1413,15 @@ function Quiz({ pool, crowded, tolerances, input, session, borders, hints }) {
   );
 }
 
+// A country's seat of government, and the commercial centre after it where
+// that's somewhere else — assembled from the city half of the drill, so the
+// two games teach each other rather than sitting side by side.
+function capitalLine(c) {
+  if (!c || !c.seats || !c.seats.length) return " ";
+  const seats = c.seats.join(", ");
+  return c.hub ? `${seats} · ${c.hub.n} is the ${c.hub.role}` : seats;
+}
+
 // The persistent record of the last guess: what it was, whether it landed,
 // and a fact or two about the place either way. Stays put until overwritten.
 function LastAnswerCard({ last }) {
@@ -1020,6 +1433,7 @@ function LastAnswerCard({ last }) {
     );
   }
   const color = last.correct ? "#5fbf7a" : "#e2645a";
+  const countries = last.domain === "countries";
   return (
     <div style={{ ...S.card, borderLeftColor: color }}>
       <div style={S.cardTop}>
@@ -1027,12 +1441,17 @@ function LastAnswerCard({ last }) {
         <span style={{ ...S.cardVerdict, color }}>{last.correct ? "Correct" : "Missed"}</span>
       </div>
       <div style={S.cardMeta}>
-        {last.role} of {last.country} · pop. {last.pop}
+        {countries ? capitalLine(last) : `${last.role} of ${last.country} · pop. ${last.pop}`}
       </div>
       {last.guessText !== undefined && !last.correct && (
         <div style={S.cardGuess}>You wrote “{last.guessText}.”</div>
       )}
-      <div style={S.cardBlurb}>{last.b}</div>
+      {/* A missed tap in the countries game names what you actually hit —
+          "you picked Zambia" is the correction, not just "wrong". */}
+      {countries && !last.correct && last.guessName && last.guessId !== last.id && (
+        <div style={S.cardGuess}>You picked {last.guessName}.</div>
+      )}
+      {last.b && <div style={S.cardBlurb}>{last.b}</div>}
     </div>
   );
 }
@@ -1072,6 +1491,30 @@ function Progress({ count, total, km, frac, score }) {
         ))}
       </div>
       <div style={S.campLabel}>{legFor(frac)}</div>
+    </div>
+  );
+}
+
+// Same meter as Progress, climbing rather than driving.
+function Altimeter({ count, total, metres, frac, score }) {
+  return (
+    <div>
+      <div style={S.scoreRow}>
+        <span style={S.scoreMain}>
+          {metres.toLocaleString()} m
+          <span style={{ color: "#8b93a7", fontSize: 12 }}> / {SUMMIT_M.toLocaleString()}</span>
+        </span>
+        <span style={S.scoreMuted}>
+          {count}/{total} · {score.total} guesses
+        </span>
+      </div>
+      <div style={S.trackOuter}>
+        <div style={{ ...S.trackFill, width: `${frac * 100}%` }} />
+        {CAMPS.slice(1, -1).map((c) => (
+          <div key={c.name} style={{ ...S.tick, left: `${c.at * 100}%` }} />
+        ))}
+      </div>
+      <div style={S.campLabel}>{campFor(frac)}</div>
     </div>
   );
 }

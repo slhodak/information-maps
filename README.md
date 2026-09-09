@@ -1,4 +1,4 @@
-# Information Maps
+![Information Maps](img/info-maps-header.png)
 
 Adventures in self-quizzing to learn fast. Interactions are simple: prompt, tap, repeat. 
 Idempotent mode makes correct answers sticky; keep guessing until you get 'em all.
@@ -7,15 +7,15 @@ Subjects include Earth Sciences, Geography, Machine Learning, and Music.
 
 In geography, a correct answer is clear by its position:
 
-![geo-image](example_images/geo-quiz-example.png)
+![geo-image](img/geo-quiz-example.png)
 
 The same principle can be applied to math,
 
-![math-image](example_images/math-quiz-example.png)
+![math-image](img/math-quiz-example.png)
 
 And through code it can be applied to processes too:
 
-![code-image](example_images/code-quiz-example.png)
+![code-image](img/code-quiz-example.png)
 
 
 ## Run it

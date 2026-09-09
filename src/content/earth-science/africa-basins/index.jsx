@@ -537,7 +537,9 @@ export default function AtlasDrill() {
   const [cat, setCat] = useState("drainage");
   const [mode, setMode] = useState("tap");
   const [session, setSession] = useState("practice");
-  const [divides, setDivides] = useState(false);
+  // Basin outlines on by default — in the drainage category they're the
+  // borders of the region you're being asked to name.
+  const [divides, setDivides] = useState(true);
   const [rivers, setRivers] = useState(true);
   const [relief, setRelief] = useState(false);
 

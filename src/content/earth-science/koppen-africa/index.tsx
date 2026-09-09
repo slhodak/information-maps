@@ -635,7 +635,9 @@ export default function AtlasDrillClimate() {
   const [input, setInput] = useState("tap");        // "type" | "tap"
   const [session, setSession] = useState("practice"); // "practice" | "climb"
   const [natl, setNatl] = useState(false);
-  const [clim, setClim] = useState(false);
+  // Climate-zone outlines on by default — they're the borders of the thing
+  // being quizzed. National borders stay off; they're just reference here.
+  const [clim, setClim] = useState(true);
   const [keyOpen, setKeyOpen] = useState(false);
 
   const [queue, setQueue] = useState(() => shuffle(allIds));

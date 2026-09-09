@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useOnline } from "./use-online";
 
 /**
  * Shared UI primitives, factored out of the drill files (the `SegButton` /
@@ -130,6 +131,61 @@ export function DrillHeading({
       <h1 className="text-2xl font-semibold text-slate-50">{title}</h1>
       {sub && <p className="mt-1 text-sm text-slate-400">{sub}</p>}
     </header>
+  );
+}
+
+/**
+ * Live network indicator for drills that pull a CDN script at runtime.
+ * Reads "Network detected" (good wifi icon) or "Network required" (no wifi
+ * icon) and flips in real time on the browser's online/offline events.
+ */
+export function NetworkBadge({ className }: { className?: string }) {
+  const online = useOnline();
+
+  return (
+    <span
+      title={
+        online
+          ? "Network detected — this drill's CDN script can load"
+          : "Network required — this drill loads a script from a CDN at runtime"
+      }
+      className={cx(
+        "inline-flex items-center gap-1 text-[11px]",
+        online ? "text-emerald-400" : "text-amber-500/80",
+        className,
+      )}
+    >
+      <svg
+        aria-hidden
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-3 w-3"
+      >
+        {online ? (
+          <>
+            <path d="M5 13a10 10 0 0 1 14 0" />
+            <path d="M8.5 16.5a5 5 0 0 1 7 0" />
+            <path d="M2 8.82a15 15 0 0 1 20 0" />
+            <line x1="12" y1="20" x2="12.01" y2="20" />
+          </>
+        ) : (
+          <>
+            <line x1="2" y1="2" x2="22" y2="22" />
+            <path d="M8.5 16.5a5 5 0 0 1 7 0" />
+            <path d="M2 8.82a15 15 0 0 1 4.17-2.65" />
+            <path d="M10.66 5c4.01-.36 8.14.9 11.34 3.76" />
+            <path d="M16.85 11.25a10 10 0 0 1 2.22 1.68" />
+            <path d="M5 13a10 10 0 0 1 5.24-2.76" />
+            <line x1="12" y1="20" x2="12.01" y2="20" />
+          </>
+        )}
+      </svg>
+      {online ? "Network detected" : "Network required"}
+    </span>
   );
 }
 

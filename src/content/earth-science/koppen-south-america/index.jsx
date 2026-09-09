@@ -538,7 +538,9 @@ function ScrollStick() {
 export default function AtlasDrillSouthAmerica() {
   const [style, setStyle] = useState("find");        // find | name
   const [session, setSession] = useState("practice"); // practice | climb
-  const [showClim, setShowClim] = useState(false);
+  // Climate-zone outlines on by default — they're the borders of the thing
+  // being quizzed. National borders stay off; they're only reference here.
+  const [showClim, setShowClim] = useState(true);
   const [showNatl, setShowNatl] = useState(false);
   const [keyOpen, setKeyOpen] = useState(false);
 

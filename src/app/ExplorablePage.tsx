@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { drillById } from "../content/registry";
 import { markVisited } from "./progress";
 import { NotFound } from "./NotFound";
+import { NetworkBadge } from "../ui";
 
 /**
  * The two legacy HTML explorables are full documents (own <head>, fixed HUD,
@@ -35,11 +36,7 @@ export default function ExplorablePage() {
           ← All drills
         </Link>
         <span className="truncate text-xs text-slate-500">{meta.title}</span>
-        {meta.needsNetwork && (
-          <span className="text-[11px] text-amber-500/80">
-            loads a CDN script — needs network
-          </span>
-        )}
+        {meta.needsNetwork && <NetworkBadge />}
       </div>
       <iframe
         title={meta.title}

@@ -18,7 +18,6 @@ export interface DrillMeta {
   id: string;
   subject: Subject;
   title: string;
-  blurb: string;
   kind: "drill" | "explorable";
   /** kind === "drill" */
   load?: () => Promise<{ default: ComponentType<unknown> }>;
